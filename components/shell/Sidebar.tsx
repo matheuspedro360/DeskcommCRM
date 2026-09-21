@@ -119,7 +119,7 @@ export function SidebarContent({
     <>
       <div
         className={cn(
-          "flex h-14 items-center justify-center border-b px-4",
+          "flex h-14 w-full items-center justify-center border-b px-4",
         )}
       >
         {logo && !collapsed ? (
