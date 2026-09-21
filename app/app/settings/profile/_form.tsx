@@ -1,5 +1,6 @@
 "use client";
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -49,6 +50,7 @@ export function ProfileForm({
   initialTimezone,
 }: Props) {
   const t = useT();
+  const router = useRouter();
   const [fullName, setFullName] = useState(initialFullName ?? "");
   const [locale, setLocale] = useState<Locale | typeof SEM_PREFERENCIA_DE_IDIOMA>(initialLocale);
   const [timezone, setTimezone] = useState(initialTimezone);
@@ -69,8 +71,16 @@ export function ProfileForm({
     }
     startTransition(async () => {
       const r = await updateProfile(parsed.data);
-      if (r.ok) toast.success(t("Perfil atualizado."));
-      else toast.error(`${t("Erro")}: ${r.error}`);
+      if (r.ok) {
+        toast.success(t("Perfil atualizado."));
+        // Esta tela também é a conclusão do primeiro cadastro de um membro.
+        // Antes ela confirmava o salvamento e o deixava parado no formulário,
+        // dando a impressão de que o cadastro continuava incompleto. A Inbox é
+        // um destino permitido para todos os perfis que usam o atendimento e
+        // o layout resolve a organização ativa antes de renderizá-la.
+        router.replace("/app/inbox");
+        router.refresh();
+      } else toast.error(`${t("Erro")}: ${r.error}`);
     });
   }
 
