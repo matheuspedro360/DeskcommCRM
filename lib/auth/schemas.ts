@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { senhaForteSchema } from "@/lib/auth/password-policy";
 
 export const loginSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -23,7 +24,7 @@ export const signupSchema = z
   .object({
     org_name: organizationNameSchema,
     email: z.string().email("Email inválido"),
-    password: z.string().min(8, "Senha deve ter pelo menos 8 caracteres"),
+    password: senhaForteSchema,
     password_confirm: z.string(),
   })
   .refine((v) => v.password === v.password_confirm, {
@@ -57,7 +58,7 @@ export const signupComConviteSchema = z
      */
     full_name: z.string().trim().min(2, "Informe seu nome").max(120),
     email: z.string().email("Email inválido"),
-    password: z.string().min(8, "Senha deve ter pelo menos 8 caracteres"),
+    password: senhaForteSchema,
     password_confirm: z.string(),
   })
   .refine((v) => v.password === v.password_confirm, {
@@ -75,7 +76,7 @@ export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 
 export const resetPasswordSchema = z
   .object({
-    password: z.string().min(8, "Senha deve ter pelo menos 8 caracteres"),
+    password: senhaForteSchema,
     password_confirm: z.string(),
     // Código TOTP: só exigido quando a conta tem MFA (a sessão de recovery é
     // AAL1 e o GoTrue pede AAL2 para trocar a senha). Opcional no schema; a

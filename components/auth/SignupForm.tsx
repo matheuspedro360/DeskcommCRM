@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { signUp } from "@/app/actions/auth/signUp";
+import { PasswordStrength } from "@/components/auth/PasswordStrength";
 
 /**
  * Convite em curso: a conta está sendo criada para ACEITAR um convite, não para
@@ -39,6 +40,7 @@ export function SignupForm({ convite }: { convite?: ConviteDoSignup }) {
 
   const {
     register,
+    watch,
     handleSubmit,
     formState: { errors },
   } = useForm<SignupInput & { full_name: string }>({
@@ -60,6 +62,7 @@ export function SignupForm({ convite }: { convite?: ConviteDoSignup }) {
       password_confirm: "",
     },
   });
+  const senha = watch("password");
 
   const onSubmit = (values: SignupInput & { full_name: string }) => {
     setServerError(null);
@@ -226,6 +229,7 @@ export function SignupForm({ convite }: { convite?: ConviteDoSignup }) {
         {errors.password && (
           <p className="text-xs text-destructive">{t(errors.password.message ?? "")}</p>
         )}
+        <PasswordStrength password={senha} />
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="password_confirm">{t("Confirmar senha")}</Label>

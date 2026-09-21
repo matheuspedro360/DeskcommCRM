@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { updatePassword } from "@/app/actions/auth/updatePassword";
+import { PasswordStrength } from "@/components/auth/PasswordStrength";
 
 export function ResetPasswordForm() {
   const t = useT();
@@ -19,12 +20,14 @@ export function ResetPasswordForm() {
 
   const {
     register,
+    watch,
     handleSubmit,
     formState: { errors },
   } = useForm<ResetPasswordInput>({
     resolver: zodResolver(resetPasswordSchema),
     defaultValues: { password: "", password_confirm: "", mfa_code: "" },
   });
+  const senha = watch("password");
 
   const onSubmit = (values: ResetPasswordInput) => {
     setServerError(null);
@@ -71,6 +74,7 @@ export function ResetPasswordForm() {
         {errors.password && (
           <p className="text-xs text-destructive">{t(errors.password.message ?? "")}</p>
         )}
+        <PasswordStrength password={senha} />
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="password_confirm">{t("Confirmar nova senha")}</Label>
