@@ -23,12 +23,34 @@ import { listarConexoesCaidas, type ConexaoCaida } from "@/lib/channels/health";
 import { VoiceCallProvider } from "@/components/voice/VoiceCallContext";
 import { ProvedorDaOcupacaoDoRodape } from "@/lib/ui/rodape-ocupado";
 import { acessoFoiRevogado } from "@/lib/auth/vinculo-revogado";
+import { createClient } from "@/lib/supabase/server";
+import { decidirConviteDoSignup } from "@/lib/auth/convite-no-signup";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await loadAuthUser();
   if (!user) redirect("/login");
 
   let activeOrg = await resolveActiveOrg(user);
+
+  // Um convidado pode terminar a confirmação/login com a conta válida, mas
+  // antes de o vínculo ter sido gravado (queda transitória, retorno do
+  // provedor fora de `/auth/confirm` ou navegação interrompida). Sem esta
+  // recuperação, `/app/settings/profile` ainda renderizava sem organização e
+  // a pessoa ficava presa numa tela que não tinha como concluir o convite.
+  //
+  // O metadata NÃO autoriza acesso: ele serve apenas para recuperar a URL. O
+  // token volta a ser validado aqui e o aceite continua passando pela action,
+  // pela linha persistida do convite e por `fn_accept_team_invite`.
+  if (!activeOrg && !user.support) {
+    const supabase = await createClient();
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser();
+    const decisao = authUser ? decidirConviteDoSignup(authUser) : null;
+    if (decisao?.tipo === "convite") {
+      redirect(`/team/accept-invite/${encodeURIComponent(decisao.token)}`);
+    }
+  }
 
   // Sem organização ativa existem DOIS estados, e eles pedem telas opostas:
   //
@@ -44,6 +66,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!activeOrg && !user.support && (await acessoFoiRevogado(user.id))) {
     redirect("/acesso-revogado");
   }
+
+  // Nenhuma página autenticada do CRM funciona sem tenant. O destino tem a
+  // segunda chance auditada para quem abriu a própria conta; convidados
+  // válidos já foram separados acima. Isso também impede que Perfil pareça
+  // uma página final sem saída.
+  if (!activeOrg && !user.support) redirect("/get-started");
 
   /**
    * A cor desta organização, serializada, ou `null` quando ela não tem uma.
