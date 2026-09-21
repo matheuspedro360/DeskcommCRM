@@ -2,7 +2,9 @@
  * GET /api/v1/team/invites — convites da organização ativa (migration 0238).
  *
  * O que a aba "Membros" da tela de Equipe não mostrava: convite enviado,
- * pendente, expirado ou revogado — e se o e-mail chegou a sair. Manager+ lê
+ * pendente, expirado ou revogado — e se o e-mail chegou a sair. Convite aceito
+ * já virou membro e não é mais trabalho pendente, portanto sai desta resposta;
+ * a linha continua no banco como trilha de auditoria. Manager+ lê
  * (RLS `team_invites_select`); as ações (reenviar / revogar) são admin.
  *
  * `status` é derivado aqui, não vem do banco. `accept_url` só acompanha convite
@@ -37,6 +39,7 @@ export async function GET(_req: NextRequest): Promise<Response> {
       "id, organization_id, email, role, interface_settings, invited_by, inviter_name, email_dispatched, created_at, last_sent_at, resend_count, expires_at, accepted_at, revoked_at",
     )
     .eq("organization_id", activeOrg.orgId)
+    .is("accepted_at", null)
     .order("created_at", { ascending: false });
 
   if (error) return fail("internal_error", error.message, 500, { requestId });

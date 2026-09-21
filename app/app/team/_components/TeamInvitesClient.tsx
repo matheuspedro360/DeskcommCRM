@@ -83,7 +83,7 @@ export function TeamInvitesClient({ canManage }: Props) {
       <div>
         <h2 className="text-sm font-semibold">{t("Convites")}</h2>
         <p className="text-xs text-muted-foreground">
-          {t("Convites enviados e seu status. Um convite aceito vira membro na lista acima.")}
+          {t("Convites ainda não concluídos. Ao aceitar, a pessoa aparece somente na lista de membros acima.")}
         </p>
       </div>
 
