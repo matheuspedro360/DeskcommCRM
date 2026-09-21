@@ -6,7 +6,9 @@ import { createClient } from "@/lib/supabase/server";
 import { cookieSecure } from "@/lib/supabase/cookie-secure";
 import { audit } from "@/lib/audit";
 
-export async function setActiveOrg(orgId: string): Promise<{ ok: boolean; error?: string }> {
+export async function setActiveOrg(
+  orgId: string,
+): Promise<{ ok: boolean; slug?: string; error?: string }> {
   if (!z.string().uuid().safeParse(orgId).success) return { ok: false, error: "invalid_organization" };
   const user = await loadAuthUser();
   if (!user) return { ok: false, error: "auth_required" };
@@ -15,7 +17,7 @@ export async function setActiveOrg(orgId: string): Promise<{ ok: boolean; error?
   // Consulta fresca: não usa status de membership serializado no browser.
   const db = await createClient();
   const { data: membership, error } = await db.from("user_organizations")
-    .select("organization_id, organizations!inner(status)")
+    .select("organization_id, organizations!inner(status, slug)")
     .eq("organization_id", orgId).eq("user_id", user.id)
     .is("revoked_at", null).not("accepted_at", "is", null)
     .eq("organizations.status", "active").maybeSingle();
@@ -28,5 +30,7 @@ export async function setActiveOrg(orgId: string): Promise<{ ok: boolean; error?
   await audit({ action: "organization.switched", actorUserId: user.id,
     organizationId: orgId, resourceType: "organization", resourceId: orgId,
     metadata: { previous_organization_id: z.string().uuid().safeParse(previous).success ? previous : null } });
-  return { ok: true };
+  const organizations = membership.organizations;
+  const organization = Array.isArray(organizations) ? organizations[0] : organizations;
+  return { ok: true, slug: organization?.slug };
 }

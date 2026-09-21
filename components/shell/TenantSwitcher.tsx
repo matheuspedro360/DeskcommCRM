@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { setActiveOrg } from "@/app/actions/shell/setActiveOrg";
+import { tenantUrl } from "@/lib/navigation/tenant-url";
 
 export function TenantSwitcher() {
   const t = useT();
@@ -27,9 +28,9 @@ export function TenantSwitcher() {
     flushSync(() => { setPending(true); transition.begin(t("Carregando organização…")); });
     try {
       const result = await setActiveOrg(orgId);
-      if (!result.ok) throw new Error(result.error);
+      if (!result.ok || !result.slug) throw new Error(result.error);
       // Novo documento elimina QueryClient, subscriptions e respostas em voo.
-      window.location.assign("/app/inbox");
+      window.location.assign(tenantUrl(result.slug, "/app/inbox"));
     } catch {
       transition.cancel();
       setPending(false);
