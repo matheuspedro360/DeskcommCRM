@@ -77,6 +77,7 @@ describe("o desenho na barra lateral", () => {
     renderSidebar(PADRAO, false);
     const logotipo = screen.getByRole("img", { name: DEFAULT_APP_NAME });
     expect(logotipo.tagName.toLowerCase()).toBe("svg");
+    expect(logotipo.parentElement?.className).toContain("justify-center");
     // O e2e `marca-logo.spec.ts` lê "barra sem <img>" como "sem logo do
     // revendedor"; um <img> do produto aqui faria a spec medir a coisa errada.
     expect(document.querySelector("img")).toBeNull();

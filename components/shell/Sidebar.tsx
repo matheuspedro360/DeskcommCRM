@@ -119,8 +119,7 @@ export function SidebarContent({
     <>
       <div
         className={cn(
-          "flex h-14 items-center border-b px-4",
-          collapsed ? "justify-center" : "justify-start",
+          "flex h-14 items-center justify-center border-b px-4",
         )}
       >
         {logo && !collapsed ? (
