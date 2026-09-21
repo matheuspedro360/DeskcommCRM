@@ -138,9 +138,9 @@ describe("as cores do desenho", () => {
 describe("o favicon segue a mesma regra", () => {
   const icone = fs.readFileSync(path.join(process.cwd(), "app/icon.tsx"), "utf8");
 
-  it("desenha o símbolo quando a marca é a do produto, e a inicial quando não é", () => {
-    expect(icone).toMatch(/marcaEhADoProduto\(\{ name: marca\.nome, logoUrl: marca\.logoUrl \}\)/);
-    expect(icone).toMatch(/<path d=\{SIMBOLO\.d\}/);
-    expect(icone).toMatch(/letraDoIcone\(marca\.nome\)/);
+  it("mantém o símbolo institucional da Decola Aí em todas as contas", () => {
+    expect(icone).toContain('viewBox="0 0 150.7 98.19"');
+    expect(icone).toContain('points="42.51 57.91 60.68 98.19 76.34 65.55 150.7 0 42.51 57.91"');
+    expect(icone).not.toMatch(/letraDoIcone|marcaEhADoProduto/);
   });
 });
