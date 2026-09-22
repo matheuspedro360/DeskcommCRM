@@ -16,6 +16,7 @@
   <body style="font-family: sans-serif; color: #1c1a16; background: #faf9f6; max-width: 480px; margin: 0 auto; padding: 24px;">
     <h2 style="font-size: 18px;">Redefinir senha</h2>
     <p>Recebemos um pedido para redefinir a senha da sua conta no __APP_NAME__. Clique no botão abaixo para escolher uma nova senha:</p>
+    <p style="font-size: 13px; color: #7d786c;">Código desta solicitação: <strong style="color: #1c1a16;">{{ .Token }}</strong></p>
     <p style="margin: 24px 0;">
       <a
         href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}"

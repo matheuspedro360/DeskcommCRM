@@ -49,7 +49,10 @@ describe("GET /email-templates/[modelo]", () => {
   it("serve o molde de recuperação", async () => {
     const res = await chamar("recovery");
     expect(res.status).toBe(200);
-    expect(await res.text()).toContain("{{ .TokenHash }}");
+    const corpo = await res.text();
+    expect(corpo).toContain("{{ .TokenHash }}");
+    expect(corpo).toContain("Código desta solicitação");
+    expect(corpo).toContain("{{ .Token }}");
   });
 
   it("modelo desconhecido é 404, não um HTML qualquer", async () => {

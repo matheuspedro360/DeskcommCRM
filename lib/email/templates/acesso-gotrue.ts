@@ -80,6 +80,12 @@ export function montarTemplateDeAcesso(modelo: ModeloDeAcesso, marca: MarcaDeSai
 
   // As chaves duplas ficam CRUAS de propósito: o GoTrue as substitui.
   const destino = "{{ .RedirectTo }}&token_hash={{ .TokenHash }}";
+  const identificadorDaSolicitacao =
+    modelo === "recovery"
+      ? `<p style="margin:0 0 16px;font-size:13px;color:${NEUTROS_DE_SAIDA.suave}">
+      Código desta solicitação: <strong style="color:${NEUTROS_DE_SAIDA.texto}">{{ .Token }}</strong>
+    </p>`
+      : "";
 
   return `<!doctype html>
 <html lang="pt-BR">
@@ -92,6 +98,7 @@ export function montarTemplateDeAcesso(modelo: ModeloDeAcesso, marca: MarcaDeSai
     <p style="margin:0 0 16px;font-size:15px;line-height:1.5">
       ${escapeHtml(t.corpo(marca.nome))}
     </p>
+    ${identificadorDaSolicitacao}
     <p style="margin:24px 0">
       <a href="${destino}" style="display:inline-block;padding:12px 24px;background:${marca.accent};color:${marca.accentFg};border-radius:6px;text-decoration:none;font-weight:600">
         ${escapeHtml(t.botao)}
