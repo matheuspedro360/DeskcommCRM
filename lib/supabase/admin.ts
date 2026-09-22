@@ -9,6 +9,7 @@
  *  - Webhook handlers (WAHA, Nuvemshop)
  *  - Cron / workers
  *  - Onboarding / admin operations explícitas
+ *  - Cadastro por convite assinado, para criar a conta já confirmada
  *  - Health check (read-only)
  *
  * Uso PROIBIDO:

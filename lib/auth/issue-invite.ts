@@ -45,7 +45,7 @@ export async function issueInvite(input: {
     invited_by: input.inviterId,
     interface_settings: interfaceSettings,
   });
-  const acceptUrl = `${env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "")}/team/accept-invite/${token}`;
+  const acceptUrl = `${env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "")}/signup?invite=${encodeURIComponent(token)}`;
   let dispatched = false;
   /**
    * POR QUE O MOTIVO É DEVOLVIDO, e não só o `false`.

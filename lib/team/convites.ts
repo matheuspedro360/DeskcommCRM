@@ -71,7 +71,7 @@ export function linkDeAceite(row: ConviteDeTime): string {
     invited_by: row.invited_by ?? undefined,
     interface_settings: row.interface_settings,
   });
-  return `${env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "")}/team/accept-invite/${token}`;
+  return `${env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "")}/signup?invite=${encodeURIComponent(token)}`;
 }
 
 interface EmitirParams {

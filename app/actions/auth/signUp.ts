@@ -14,6 +14,8 @@ import { modoDeCadastro } from "@/lib/auth/politica-de-cadastro";
 import { audit, hashEmail } from "@/lib/audit";
 import { authRateLimited, AUTH_LIMITS } from "@/lib/auth/rate-limit";
 import { env } from "@/lib/env";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { aplicarConvite } from "@/lib/auth/aplicar-convite";
 
 export type SignUpResult =
   | {
@@ -34,6 +36,8 @@ export type SignUpResult =
        * Achado de @KIRAzinx566, com um cliente real travado nessa tela.
        */
       sessao_ativa: boolean;
+      /** Convite válido já foi aplicado; não existe outra confirmação. */
+      convite_aceito?: boolean;
     }
   | {
       ok: false;
@@ -134,6 +138,78 @@ export async function signUp(
   }
 
   const supabase = await createClient();
+
+  // Convite assinado e ainda válido já comprova o controle do endereço: ele
+  // só chegou à caixa postal da pessoa convidada. Exigir um segundo e-mail
+  // repete a mesma prova e cria um beco sem saída. Neste caminho restrito,
+  // criamos a conta confirmada, abrimos a sessão e aplicamos o convite agora.
+  if (convite !== null && inviteToken) {
+    const payload = verifyInviteToken(inviteToken)!;
+    const admin = createAdminClient();
+    const { data: criada, error: erroCriacao } = await admin.auth.admin.createUser({
+      email: parsed.data.email,
+      password: parsed.data.password,
+      email_confirm: true,
+      user_metadata: {
+        invite_token: convite,
+        full_name: (parsed.data as SignupComConviteInput).full_name,
+      },
+    });
+
+    if (erroCriacao || !criada.user) {
+      const jaExiste = /already\s*(?:been\s*)?(?:registered|exists)|already_registered/i.test(
+        erroCriacao?.message ?? "",
+      );
+      if (jaExiste) return { ok: false, error: "conta_ja_existe" };
+      await audit({
+        action: "auth.signup_failed",
+        metadata: {
+          email_hash: hashEmail(parsed.data.email),
+          reason: erroCriacao?.message ?? "invite_user_not_created",
+        },
+        requestId,
+        ip,
+        userAgent,
+      });
+      return { ok: false, error: "signup_failed" };
+    }
+
+    const { error: erroSessao } = await supabase.auth.signInWithPassword({
+      email: parsed.data.email,
+      password: parsed.data.password,
+    });
+    if (erroSessao) {
+      await audit({
+        action: "auth.signup_failed",
+        actorUserId: criada.user.id,
+        metadata: { email_hash: hashEmail(parsed.data.email), reason: "invite_signin_failed" },
+        requestId,
+        ip,
+        userAgent,
+      });
+      return { ok: false, error: "signup_failed" };
+    }
+
+    const aceite = await aplicarConvite({ userId: criada.user.id, payload, requestId });
+    if (!aceite.ok) {
+      return {
+        ok: false,
+        error: aceite.motivo === "invalid_or_expired" ? "validation_error" : "signup_failed",
+        details: aceite.motivo === "invalid_or_expired" ? { invite: ["convite_invalido"] } : undefined,
+      };
+    }
+
+    await audit({
+      action: "auth.signup_requested",
+      actorUserId: criada.user.id,
+      metadata: { email_hash: hashEmail(parsed.data.email), source: "team_invite" },
+      requestId,
+      ip,
+      userAgent,
+    });
+    return { ok: true, sessao_ativa: true, convite_aceito: true };
+  }
+
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,

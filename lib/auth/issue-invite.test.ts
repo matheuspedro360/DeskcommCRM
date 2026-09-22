@@ -14,7 +14,7 @@ beforeEach(() => vi.resetAllMocks());
 it("sem serviço de e-mail continua com link assinado, validade e auditoria sem token", async () => {
   h.send.mockResolvedValue({ ok: false, error: "not_configured" });
   const result = await issueInvite(input);
-  const token = result.accept_url.split("/").at(-1)!;
+  const token = new URL(result.accept_url).searchParams.get("invite")!;
   expect(result.email_dispatched).toBe(false);
   expect(result.email_error).toBe("not_configured");
   expect(verifyInviteToken(token)).toMatchObject({ invited_by: input.inviterId, organization_id: input.organizationId, role: "admin" });
@@ -26,7 +26,7 @@ it("falha lançada pelo envio continua com recuperação visível", async () => 
   const result = await issueInvite(input);
   expect(result.email_dispatched).toBe(false);
   expect(result.email_error).toBe("send_failed");
-  expect(result.accept_url).toContain("/team/accept-invite/");
+  expect(result.accept_url).toContain("/signup?invite=");
 });
 it("replay usa identidade/prazo estáveis e não reenvia", async () => {
   const args = { ...input, dispatch: false, inviteId: input.inviterId, issuedAt: Math.floor(Date.now()/1000) };

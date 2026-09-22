@@ -27,6 +27,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { aplicarConvite } from "@/lib/auth/aplicar-convite";
 import { modoDeCadastro } from "@/lib/auth/politica-de-cadastro";
 
 vi.mock("next/headers", () => ({ headers: vi.fn() }));
@@ -36,12 +38,16 @@ vi.mock("@/lib/auth/politica-de-cadastro", () => ({
   modoDeCadastro: vi.fn(async () => "aberto"),
 }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
+vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn() }));
+vi.mock("@/lib/auth/aplicar-convite", () => ({ aplicarConvite: vi.fn() }));
 vi.mock("@/lib/audit", async (orig) => ({
   ...(await orig<Record<string, unknown>>()),
   audit: vi.fn(async () => undefined),
 }));
 
 const signUpDoProvedor = vi.fn();
+const signInDoProvedor = vi.fn();
+const criarUsuarioAdmin = vi.fn();
 
 /** Um e-mail novo por caso: o teto de `signup` é por IP e por janela. */
 let n = 0;
@@ -56,12 +62,14 @@ describe("signUp — a tela precisa saber se a sessão já veio aberta", () => {
   beforeEach(() => {
     vi.resetModules();
     signUpDoProvedor.mockReset();
+    signInDoProvedor.mockReset();
+    criarUsuarioAdmin.mockReset();
     vi.mocked(headers).mockResolvedValue({
       // IP diferente a cada caso, pelo mesmo motivo do e-mail.
       get: (k: string) => (k === "x-forwarded-for" ? `198.51.100.${n % 250}` : null),
     } as never);
     vi.mocked(createClient).mockResolvedValue({
-      auth: { signUp: signUpDoProvedor },
+      auth: { signUp: signUpDoProvedor, signInWithPassword: signInDoProvedor },
     } as never);
     vi.mocked(modoDeCadastro).mockResolvedValue("aberto");
   });
@@ -116,12 +124,18 @@ describe("signUp — instalação que só aceita convidados", () => {
   beforeEach(() => {
     vi.resetModules();
     signUpDoProvedor.mockReset();
+    signInDoProvedor.mockReset();
+    criarUsuarioAdmin.mockReset();
     vi.mocked(headers).mockResolvedValue({
       get: (k: string) => (k === "x-forwarded-for" ? `203.0.113.${n % 250}` : null),
     } as never);
     vi.mocked(createClient).mockResolvedValue({
-      auth: { signUp: signUpDoProvedor },
+      auth: { signUp: signUpDoProvedor, signInWithPassword: signInDoProvedor },
     } as never);
+    vi.mocked(createAdminClient).mockReturnValue({
+      auth: { admin: { createUser: criarUsuarioAdmin } },
+    } as never);
+    vi.mocked(aplicarConvite).mockResolvedValue({ ok: true, membershipId: "m-1", mudou: true });
     vi.mocked(modoDeCadastro).mockResolvedValue("so_convite");
   });
 
@@ -149,10 +163,11 @@ describe("signUp — instalação que só aceita convidados", () => {
       role: "agent",
       exp: Math.floor(Date.now() / 1000) + INVITE_TTL_SECONDS,
     });
-    signUpDoProvedor.mockResolvedValue({
-      data: { user: { id: "u-3" }, session: null },
+    criarUsuarioAdmin.mockResolvedValue({
+      data: { user: { id: "u-3" } },
       error: null,
     });
+    signInDoProvedor.mockResolvedValue({ data: { session: {} }, error: null });
 
     const { signUp } = await import("./signUp");
     const res = await signUp(
@@ -169,7 +184,13 @@ describe("signUp — instalação que só aceita convidados", () => {
       token,
     );
 
-    expect(res).toEqual({ ok: true, sessao_ativa: false });
-    expect(signUpDoProvedor).toHaveBeenCalled();
+    expect(res).toEqual({ ok: true, sessao_ativa: true, convite_aceito: true });
+    expect(criarUsuarioAdmin).toHaveBeenCalledWith(
+      expect.objectContaining({ email: dados.email, email_confirm: true }),
+    );
+    expect(signInDoProvedor).toHaveBeenCalled();
+    expect(aplicarConvite).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: "u-3" }),
+    );
   });
 });

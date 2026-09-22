@@ -79,6 +79,10 @@ export function SignupForm({ convite }: { convite?: ConviteDoSignup }) {
         : values;
       const res = await signUp(entrada, convite?.token);
       if (res.ok) {
+        if (res.convite_aceito) {
+          router.replace("/app/settings/profile");
+          return;
+        }
         /**
          * ⚠️ O PROVEDOR JÁ DEIXOU A PESSOA ENTRAR — não existe e-mail para ela
          * esperar. Acontece quando "Confirm email" está desligado no provedor

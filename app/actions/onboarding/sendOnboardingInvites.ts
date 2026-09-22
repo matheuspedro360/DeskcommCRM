@@ -90,7 +90,7 @@ export async function sendOnboardingInvites(payload: InvitePayload): Promise<Sen
       role: inv.role,
       exp,
     });
-    const acceptUrl = `${baseUrl.replace(/\/$/, "")}/team/accept-invite/${token}`;
+    const acceptUrl = `${baseUrl.replace(/\/$/, "")}/signup?invite=${encodeURIComponent(token)}`;
     const expiresAt = new Date(exp * 1000);
     const { subject, html, text } = buildInviteEmail({
       inviterName,
