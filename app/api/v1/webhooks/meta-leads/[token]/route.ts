@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 import { fail, ok } from "@/lib/api/wrappers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { decryptWebhookSecret } from "@/lib/webhooks/secrets";
-import { assinaturaMetaValida, extrairEventosMetaLeadgen, mapearDetalheDoLeadMeta } from "@/lib/webhooks/meta-leadgen";
+import { assinaturaMetaValida, buildContactConsentMeta, extrairConsentimentoMeta, extrairEventosMetaLeadgen, mapearDetalheDoLeadMeta } from "@/lib/webhooks/meta-leadgen";
 import { POST as receberWebhookGenerico } from "@/app/api/v1/webhooks/in/[token]/route";
 
 export const runtime = "nodejs";
@@ -54,6 +54,7 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
     });
     const detalheBruto = await resposta.json().catch(() => null);
     const detalhe = mapearDetalheDoLeadMeta(detalheBruto);
+    const consentimento = extrairConsentimentoMeta(detalheBruto);
     if (!resposta.ok || !detalhe) {
       falhas.push(`lead ${evento.leadgen_id}: Graph API ${resposta.status}`);
       continue;
@@ -61,8 +62,27 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
     const corpo = { ...detalhe, nome: detalhe.full_name, telefone: detalhe.phone_number, email: detalhe.email, meta_page_id: evento.page_id, meta_form_id: evento.form_id, meta_ad_id: evento.ad_id };
     const interna = new NextRequest(`https://internal/api/v1/webhooks/in/${source.path_token}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corpo) });
     const result = await receberWebhookGenerico(interna, { params: Promise.resolve({ token: source.path_token }) });
-    if (result.ok) aceitos += 1;
-    else falhas.push(`lead ${evento.leadgen_id}: ingestão ${result.status}`);
+    if (result.ok) {
+      aceitos += 1;
+      if (consentimento) {
+        const respostaIngestao = await result.clone().json().catch(() => null) as { data?: { lead_id?: string } } | null;
+        const leadId = respostaIngestao?.data?.lead_id;
+        if (!leadId) {
+          falhas.push(`lead ${evento.leadgen_id}: resposta da ingestão sem lead_id`);
+          continue;
+        }
+        const { data: lead } = await admin.from("crm_leads").select("contact_id")
+          .eq("id", leadId).eq("organization_id", c.organization_id).maybeSingle();
+        if (!lead?.contact_id) {
+          falhas.push(`lead ${evento.leadgen_id}: contato não encontrado após ingestão`);
+          continue;
+        }
+        const { error: consentError } = await admin.from("contacts")
+          .update({ consent: buildContactConsentMeta(consentimento, evento.form_id) })
+          .eq("id", lead.contact_id).eq("organization_id", c.organization_id);
+        if (consentError) falhas.push(`lead ${evento.leadgen_id}: falha ao gravar consentimento`);
+      }
+    } else falhas.push(`lead ${evento.leadgen_id}: ingestão ${result.status}`);
   }
   await admin.from("meta_lead_connections").update({
     last_received_at: new Date().toISOString(),
