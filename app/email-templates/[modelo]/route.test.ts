@@ -53,6 +53,7 @@ describe("GET /email-templates/[modelo]", () => {
     expect(corpo).toContain("{{ .TokenHash }}");
     expect(corpo).toContain("Código desta solicitação");
     expect(corpo).toContain("{{ .Token }}");
+    expect(corpo).toContain("Definir nova senha · {{ .Token }}");
   });
 
   it("modelo desconhecido é 404, não um HTML qualquer", async () => {

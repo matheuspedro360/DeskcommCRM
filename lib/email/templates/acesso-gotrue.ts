@@ -60,7 +60,8 @@ const COPIA: Record<ModeloDeAcesso, { assunto: (marca: string) => string; titulo
 };
 
 export function assuntoDoModelo(modelo: ModeloDeAcesso, marca: MarcaDeSaida): string {
-  return COPIA[modelo].assunto(marca.nome);
+  const assunto = COPIA[modelo].assunto(marca.nome);
+  return modelo === "recovery" ? `${assunto} · {{ .Token }}` : assunto;
 }
 
 /**
@@ -101,7 +102,7 @@ export function montarTemplateDeAcesso(modelo: ModeloDeAcesso, marca: MarcaDeSai
     ${identificadorDaSolicitacao}
     <p style="margin:24px 0">
       <a href="${destino}" style="display:inline-block;padding:12px 24px;background:${marca.accent};color:${marca.accentFg};border-radius:6px;text-decoration:none;font-weight:600">
-        ${escapeHtml(t.botao)}
+        ${escapeHtml(t.botao)}${modelo === "recovery" ? " · {{ .Token }}" : ""}
       </a>
     </p>
     <p style="margin:0 0 8px;font-size:13px;color:${NEUTROS_DE_SAIDA.suave}">

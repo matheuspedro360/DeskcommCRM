@@ -67,6 +67,11 @@ describe("moldes de acesso do GoTrue", () => {
     expect(html).not.toContain("<img");
   });
 
+  it("diferencia cada recuperação no assunto para o Gmail não agrupá-la", () => {
+    expect(assuntoDoModelo("recovery", MARCA)).toContain("{{ .Token }}");
+    expect(assuntoDoModelo("confirmation", MARCA)).not.toContain("{{ .Token }}");
+  });
+
   it("a rota dos moldes é PÚBLICA — senão o GoTrue recebe a tela de login", () => {
     // Este é o caso mais caro do arquivo. Quem busca é o GoTrue, que não tem
     // sessão nossa: sem entrada em PUBLIC_PATHS o proxy responde 307 para

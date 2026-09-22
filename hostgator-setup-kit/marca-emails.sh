@@ -345,7 +345,7 @@ fi
 # ── 5. Sobe ────────────────────────────────────────────────────────────────
 corpo="{
   \"mailer_subjects_confirmation\": \"$(json_escape "Confirme seu e-mail — $APP_NOME")\",
-  \"mailer_subjects_recovery\": \"$(json_escape "Redefinir senha — $APP_NOME")\",
+  \"mailer_subjects_recovery\": \"$(json_escape "Redefinir senha — $APP_NOME · {{ .Token }}")\",
   \"mailer_templates_confirmation_content\": \"$(json_escape "$HTML_CONFIRM")\",
   \"mailer_templates_recovery_content\": \"$(json_escape "$HTML_RECOVERY")\",
   \"site_url\": \"$(json_escape "$SITE_NOVO")\",
