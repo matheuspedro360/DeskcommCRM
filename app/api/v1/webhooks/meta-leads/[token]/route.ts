@@ -30,24 +30,45 @@ export async function GET(req: NextRequest, ctx: Ctx): Promise<Response> {
 export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
   const requestId = randomUUID();
   const { token } = await ctx.params;
-  const { data: c, error } = await conexao(token);
-  if (error || !c) return fail("not_found", "unknown Meta callback", 404, { requestId });
+  const { data: callbackConnection, error } = await conexao(token);
+  if (error || !callbackConnection) return fail("not_found", "unknown Meta callback", 404, { requestId });
   const admin = createAdminClient();
-  const [appSecret, pageToken] = await Promise.all([
-    decryptWebhookSecret(admin, String(c.app_secret_encrypted)),
-    decryptWebhookSecret(admin, String(c.page_access_token_encrypted)),
-  ]);
-  if (!appSecret || !pageToken) return fail("internal_error", "Meta credentials unavailable", 500, { requestId });
   const raw = await req.text();
-  if (!assinaturaMetaValida(raw, req.headers.get("x-hub-signature-256"), appSecret)) return fail("forbidden", "invalid Meta signature", 403, { requestId });
   let payload: unknown;
   try { payload = JSON.parse(raw); } catch { return fail("invalid_request", "invalid JSON", 400, { requestId }); }
   const eventos = extrairEventosMetaLeadgen(payload);
-  const source = c.webhook_sources as unknown as { path_token: string };
+  const pageIds = [...new Set(eventos.map((evento) => evento.page_id))];
+  const { data: connections, error: connectionsError } = pageIds.length
+    ? await admin.from("meta_lead_connections")
+      .select("id,organization_id,webhook_source_id,page_id,form_ids,app_secret_encrypted,page_access_token_encrypted,is_active,webhook_sources!inner(path_token)")
+      .in("page_id", pageIds).eq("is_active", true)
+    : { data: [], error: null };
+  if (connectionsError) return fail("internal_error", "Meta connection lookup failed", 500, { requestId });
+
+  // A Meta mantém um único callback para o objeto Page de cada aplicativo.
+  // Portanto o token da URL identifica o ingresso compartilhado, enquanto a
+  // página presente no payload escolhe a conexão (e o tenant) que será usada.
+  const byPage = new Map((connections ?? []).map((connection) => [String(connection.page_id), connection]));
   let aceitos = 0;
   const falhas: string[] = [];
+  const recebidas = new Set<string>();
   for (const evento of eventos) {
-    if (evento.page_id !== c.page_id || (c.form_ids.length && !c.form_ids.includes(evento.form_id))) continue;
+    const c = byPage.get(evento.page_id);
+    if (!c || (c.form_ids.length && !c.form_ids.includes(evento.form_id))) continue;
+    recebidas.add(c.id);
+    const [appSecret, pageToken] = await Promise.all([
+      decryptWebhookSecret(admin, String(c.app_secret_encrypted)),
+      decryptWebhookSecret(admin, String(c.page_access_token_encrypted)),
+    ]);
+    if (!appSecret || !pageToken) {
+      falhas.push(`lead ${evento.leadgen_id}: credenciais indisponíveis`);
+      continue;
+    }
+    if (!assinaturaMetaValida(raw, req.headers.get("x-hub-signature-256"), appSecret)) {
+      falhas.push(`lead ${evento.leadgen_id}: assinatura inválida`);
+      continue;
+    }
+    const source = c.webhook_sources as unknown as { path_token: string };
     const resposta = await fetch(`https://graph.facebook.com/v25.0/${encodeURIComponent(evento.leadgen_id)}`, {
       cache: "no-store",
       headers: { Authorization: `Bearer ${pageToken}` },
@@ -84,10 +105,12 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
       }
     } else falhas.push(`lead ${evento.leadgen_id}: ingestão ${result.status}`);
   }
-  await admin.from("meta_lead_connections").update({
-    last_received_at: new Date().toISOString(),
-    last_error: falhas.length ? falhas.join("; ").slice(0, 1000) : null,
-  }).eq("id", c.id).eq("organization_id", c.organization_id);
+  if (recebidas.size) {
+    await admin.from("meta_lead_connections").update({
+      last_received_at: new Date().toISOString(),
+      last_error: falhas.length ? falhas.join("; ").slice(0, 1000) : null,
+    }).in("id", [...recebidas]);
+  }
 
   // A Meta considera qualquer resposta não-2xx uma falha do lote inteiro e o
   // reenviará. O endpoint genérico já é idempotente por leadgen_id, portanto
