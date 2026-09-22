@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { assinaturaMetaValida, extrairEventosMetaLeadgen, mapearDetalheDoLeadMeta } from "./meta-leadgen";
+import { assinaturaMetaValida, extrairConsentimentoMeta, extrairEventosMetaLeadgen, mapearDetalheDoLeadMeta } from "./meta-leadgen";
 
 describe("webhook leadgen da Meta", () => {
   it("aceita somente a assinatura sha256 correta", () => {
@@ -29,5 +29,30 @@ describe("webhook leadgen da Meta", () => {
       { name: "phone_number", values: ["+5511999999999"] },
       { name: "faixa_de_renda", values: ["5 a 8 mil"] },
     ] })).toEqual({ external_id: "lead-1", full_name: "Maria", phone_number: "+5511999999999", faixa_de_renda: "5 a 8 mil" });
+  });
+});
+
+describe("extrairConsentimentoMeta", () => {
+  const detalhe = (name: string, value: string) => ({
+    id: "lead-1",
+    field_data: [{ name, values: [value] }],
+  });
+
+  it("reconhece autorização explícita", () => {
+    expect(extrairConsentimentoMeta(detalhe("autorizacao_de_contato_whatsapp", "Sim")))
+      .toMatchObject({ granted: true, rawAnswer: "Sim" });
+  });
+
+  it("reconhece recusa explícita", () => {
+    expect(extrairConsentimentoMeta(detalhe("marketing_consent", "Não autorizo")))
+      .toMatchObject({ granted: false, rawAnswer: "Não autorizo" });
+  });
+
+  it("não presume consentimento quando o campo não existe", () => {
+    expect(extrairConsentimentoMeta(detalhe("qual_o_seu_interesse", "Apartamento"))).toBeNull();
+  });
+
+  it("não interpreta resposta ambígua", () => {
+    expect(extrairConsentimentoMeta(detalhe("marketing_consent", "Talvez mais tarde"))).toBeNull();
   });
 });
