@@ -45,16 +45,38 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
   const eventos = extrairEventosMetaLeadgen(payload);
   const source = c.webhook_sources as unknown as { path_token: string };
   let aceitos = 0;
+  const falhas: string[] = [];
   for (const evento of eventos) {
     if (evento.page_id !== c.page_id || (c.form_ids.length && !c.form_ids.includes(evento.form_id))) continue;
-    const resposta = await fetch(`https://graph.facebook.com/v25.0/${encodeURIComponent(evento.leadgen_id)}?access_token=${encodeURIComponent(pageToken)}`, { cache: "no-store" });
-    const detalhe = mapearDetalheDoLeadMeta(await resposta.json());
-    if (!resposta.ok || !detalhe) continue;
+    const resposta = await fetch(`https://graph.facebook.com/v25.0/${encodeURIComponent(evento.leadgen_id)}`, {
+      cache: "no-store",
+      headers: { Authorization: `Bearer ${pageToken}` },
+    });
+    const detalheBruto = await resposta.json().catch(() => null);
+    const detalhe = mapearDetalheDoLeadMeta(detalheBruto);
+    if (!resposta.ok || !detalhe) {
+      falhas.push(`lead ${evento.leadgen_id}: Graph API ${resposta.status}`);
+      continue;
+    }
     const corpo = { ...detalhe, nome: detalhe.full_name, telefone: detalhe.phone_number, email: detalhe.email, meta_page_id: evento.page_id, meta_form_id: evento.form_id, meta_ad_id: evento.ad_id };
     const interna = new NextRequest(`https://internal/api/v1/webhooks/in/${source.path_token}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corpo) });
     const result = await receberWebhookGenerico(interna, { params: Promise.resolve({ token: source.path_token }) });
     if (result.ok) aceitos += 1;
+    else falhas.push(`lead ${evento.leadgen_id}: ingestão ${result.status}`);
   }
-  await admin.from("meta_lead_connections").update({ last_received_at: new Date().toISOString(), last_error: null }).eq("id", c.id).eq("organization_id", c.organization_id);
+  await admin.from("meta_lead_connections").update({
+    last_received_at: new Date().toISOString(),
+    last_error: falhas.length ? falhas.join("; ").slice(0, 1000) : null,
+  }).eq("id", c.id).eq("organization_id", c.organization_id);
+
+  // A Meta considera qualquer resposta não-2xx uma falha do lote inteiro e o
+  // reenviará. O endpoint genérico já é idempotente por leadgen_id, portanto
+  // pedimos retry quando um evento elegível falhou sem duplicar os aceitos.
+  if (falhas.length) {
+    return fail("upstream_error", "Não foi possível processar todos os leads da Meta.", 502, {
+      requestId,
+      details: { accepted: aceitos, failed: falhas.length },
+    });
+  }
   return ok({ received: true, accepted: aceitos }, { requestId });
 }
