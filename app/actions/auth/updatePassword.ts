@@ -6,6 +6,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { resetPasswordSchema, type ResetPasswordInput } from "@/lib/auth/schemas";
 import { audit } from "@/lib/audit";
+import { decidirConviteDoSignup } from "@/lib/auth/convite-no-signup";
+import { aplicarConvite } from "@/lib/auth/aplicar-convite";
 
 export type UpdatePasswordResult = {
   ok: false;
@@ -20,9 +22,10 @@ export type UpdatePasswordResult = {
 };
 
 /**
- * Define a nova senha dentro da sessão de recovery (estabelecida pelo link do
- * e-mail via /auth/confirm). Ao concluir, encerra a sessão e redireciona para
- * /login?reset=success — o usuário prova a senha nova num login limpo.
+ * Define a nova senha dentro da sessão de recovery e a prova imediatamente
+ * num login por senha. Só anuncia sucesso depois dessa segunda verificação.
+ * A sessão verificada continua aberta para não devolver a pessoa ao mesmo
+ * formulário de login que ela acabou de provar.
  */
 export async function updatePassword(
   input: ResetPasswordInput,
@@ -85,6 +88,39 @@ export async function updatePassword(
     return { ok: false, error: "update_failed" };
   }
 
+  // Não basta o provedor aceitar o UPDATE: o defeito medido em produção
+  // mostrava “Senha redefinida com sucesso” e, na tela seguinte, recusava a
+  // mesma credencial. Esta chamada é a prova ponta a ponta antes do sucesso.
+  const { data: sessaoValidada, error: erroValidacao } =
+    await supabase.auth.signInWithPassword({
+      email: user.email ?? "",
+      password: parsed.data.password,
+    });
+  if (erroValidacao || !sessaoValidada.user) {
+    await audit({
+      action: "auth.password_reset_failed",
+      actorUserId: user.id,
+      metadata: { reason: erroValidacao?.message ?? "password_verification_failed" },
+      requestId,
+      ip,
+      userAgent,
+    });
+    return { ok: false, error: "update_failed" };
+  }
+
+  // Contas antigas podiam chegar ao recovery com o convite guardado no perfil,
+  // mas sem vínculo com a empresa. Como a senha e o e-mail acabaram de ser
+  // provados, concluímos o convite aqui em vez de deixá-las cair num CRM vazio.
+  const decisao = decidirConviteDoSignup(sessaoValidada.user);
+  if (decisao?.tipo === "convite") {
+    const aceite = await aplicarConvite({
+      userId: sessaoValidada.user.id,
+      payload: decisao.payload,
+      requestId,
+    });
+    if (!aceite.ok) return { ok: false, error: "update_failed" };
+  }
+
   await audit({
     action: "auth.password_reset_completed",
     actorUserId: user.id,
@@ -94,6 +130,5 @@ export async function updatePassword(
     userAgent,
   });
 
-  await supabase.auth.signOut();
-  redirect("/login?reset=success");
+  redirect(decisao?.tipo === "convite" ? "/app/settings/profile" : "/app");
 }
