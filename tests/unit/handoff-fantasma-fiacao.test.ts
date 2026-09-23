@@ -32,21 +32,22 @@ describe("fiação — caso humano aberto move o lead pra etapa de handoff", () 
     const i = FONTE_INBOUND.indexOf("chain.status === 'vetoed' && chain.code === 'case_promise_without_case'");
     expect(i).toBeGreaterThan(-1);
     const janela = FONTE_INBOUND.slice(i, i + 1800);
-    expect(janela).toMatch(/openedCaseThisTurn = true;\s*\n\s*moverParaHandoffBestEffort\(/);
+    expect(janela).toMatch(/openedCaseThisTurn = true;\s*\n\s*await moverParaHandoffBestEffort\(/);
   });
 
   it("a tool open_human_case (caso deliberado do modelo) também chama moverParaHandoffBestEffort", () => {
     const i = FONTE_INBOUND.indexOf("rawTools.open_human_case = tool({");
     expect(i).toBeGreaterThan(-1);
     const janela = FONTE_INBOUND.slice(i, i + 1500);
-    expect(janela).toMatch(/openedCaseThisTurn = true;\s*\n\s*moverParaHandoffBestEffort\(/);
+    expect(janela).toMatch(/openedCaseThisTurn = true;\s*\n\s*await moverParaHandoffBestEffort\(/);
   });
 
-  it("moverParaHandoffBestEffort é best-effort — nunca derruba o turno (.catch, não throw)", () => {
+  it("moverParaHandoffBestEffort espera o movimento e absorve falhas sem derrubar o turno", () => {
     const i = FONTE_INBOUND.indexOf("const moverParaHandoffBestEffort = ");
     expect(i).toBeGreaterThan(-1);
-    const janela = FONTE_INBOUND.slice(i, i + 500);
-    expect(janela).toContain(".catch(");
+    const janela = FONTE_INBOUND.slice(i, i + 1700);
+    expect(janela).toContain("await moverLeadParaEtapaDeHandoff");
+    expect(janela).toContain("} catch (err) {");
   });
 });
 
