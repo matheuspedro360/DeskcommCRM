@@ -30,6 +30,7 @@ import { loadEligibleAttendants } from "@/lib/routing/eligibles";
 import { selectRoundRobin } from "@/lib/routing/decide";
 import { getQueuePosition } from "@/lib/routing/queue";
 import { logger } from "@/lib/logger";
+import { atribuirLeadDoHandoff } from "@/lib/leads/handoff-owner-sync";
 import type { McpToolDefinition } from "../types";
 
 const inputShape = {
@@ -167,24 +168,16 @@ export const crmRequestHumanHandoff: McpToolDefinition<typeof inputShape> = {
           });
         } else {
           assignedUserId = picked;
-          // A Central já recebe o handoff; este evento também avisa diretamente
-          // o atendente escolhido quando ele habilitou notificações push.
-          const { error: avisoErr } = await ctx.supabase.rpc("emit_event", {
-            p_event_type: "user.mentioned",
-            p_entity_kind: "conversation",
-            p_entity_id: input.conversation_id,
-            p_payload: {
-              to_user_id: picked,
-              conversation_id: input.conversation_id,
-              body_preview: "A IA encaminhou uma conversa para seu atendimento.",
-            },
-            p_metadata: { source: "crm_request_human_handoff" },
-            p_organization_id: ctx.organizationId,
-          });
-          if (avisoErr) logger.warn("[mcp.handoff] direct notification failed", {
-            conversation_id: input.conversation_id,
-            error: avisoErr.message,
-          });
+          // O negócio acompanha a conversa. lead.assigned alimenta a
+          // notificação direta (push, quando habilitado), além da Central.
+          if (leadId) {
+            const motivo = await atribuirLeadDoHandoff(ctx.supabase, {
+              organizationId: ctx.organizationId, leadId, userId: picked,
+            }).catch(() => "indisponivel" as const);
+            if (motivo === "indisponivel") logger.warn("[mcp.handoff] lead owner sync failed", {
+              lead_id: leadId,
+            });
+          }
         }
       }
 

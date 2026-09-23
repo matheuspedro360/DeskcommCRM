@@ -159,21 +159,6 @@ describe("crm_request_human_handoff v2 (INB-12 — roteamento G5 unificado)", ()
           p_reason: "handoff", p_schedule: {},
         },
       },
-      {
-        fn: "emit_event",
-        args: {
-          p_event_type: "user.mentioned",
-          p_entity_kind: "conversation",
-          p_entity_id: CONV_ID,
-          p_payload: {
-            to_user_id: AGENT_ID,
-            conversation_id: CONV_ID,
-            body_preview: "A IA encaminhou uma conversa para seu atendimento.",
-          },
-          p_metadata: { source: "crm_request_human_handoff" },
-          p_organization_id: ORG_ID,
-        },
-      },
     ]);
     expect(result.assigned_to).toBe(AGENT_ID);
     expect(result.queued).toBe(false);

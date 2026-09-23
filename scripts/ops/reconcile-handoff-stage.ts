@@ -5,6 +5,7 @@
  */
 import { createAdminClient } from "../../lib/supabase/admin";
 import { moverLeadParaEtapaDeHandoff } from "../../lib/leads/handoff-stage-move";
+import { atribuirLeadDoHandoff } from "../../lib/leads/handoff-owner-sync";
 
 const [organizationId, assigneeId, ...rest] = process.argv.slice(2);
 const apply = rest.includes("--apply");
@@ -39,20 +40,23 @@ for (const leadId of leadIds) {
   const { data: stage, error: stageError } = await admin.from("crm_stages")
     .select("slug").eq("id", lead.stage_id).eq("pipeline_id", lead.pipeline_id).maybeSingle();
   if (stageError) throw stageError;
-  if (!stage || !["leads_novos", "atendimento_ia_sofia"].includes(stage.slug)) {
-    console.log(`${leadId}: ignorado (etapa atual não é novo/IA)`);
+  if (!stage || !["leads_novos", "atendimento_ia_sofia", "chamar-humano"].includes(stage.slug)) {
+    console.log(`${leadId}: ignorado (etapa atual não é novo/IA/aguardando)`);
     continue;
   }
   if (!apply) {
-    console.log(`${leadId}: elegível para Aguardando Luiz (simulação)`);
+    console.log(`${leadId}: elegível para Aguardando Luiz/responsável (simulação)`);
     continue;
   }
-  const result = await moverLeadParaEtapaDeHandoff(admin, {
-    organizationId,
-    leadId,
-    reason: "reconciliacao_handoff_ja_registrado",
-  });
-  console.log(`${leadId}: ${result.motivo}`);
+  const result = stage.slug === "chamar-humano"
+    ? { motivo: "ja_esta_la" }
+    : await moverLeadParaEtapaDeHandoff(admin, {
+      organizationId,
+      leadId,
+      reason: "reconciliacao_handoff_ja_registrado",
+    });
+  const owner = await atribuirLeadDoHandoff(admin, { organizationId, leadId, userId: assigneeId });
+  console.log(`${leadId}: etapa=${result.motivo}, responsavel=${owner}`);
 }
 }
 
