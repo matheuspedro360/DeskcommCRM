@@ -320,6 +320,28 @@ describe("leads gerados por formulário", () => {
     ).toBe(3);
   });
 
+  it("usa o resultado quando a Meta não inclui o lead em actions", () => {
+    expect(
+      leadsGeradosDeFormulario(undefined, [
+        {
+          indicator: "actions:onsite_conversion.lead_grouped",
+          values: [{ value: "13" }],
+        },
+      ]),
+    ).toBe(13);
+  });
+
+  it("não usa resultado de conversa como lead de formulário", () => {
+    expect(
+      leadsGeradosDeFormulario(undefined, [
+        {
+          indicator: "actions:onsite_conversion.messaging_conversation_started_7d",
+          values: [{ value: "13" }],
+        },
+      ]),
+    ).toBeNull();
+  });
+
   it("mantém a contagem vazia quando a plataforma não devolveu ação de formulário", () => {
     const linha = linhaDoInsight(COM_CONNECT_RATE);
     expect(linha.leadsGerados).toBeNull();

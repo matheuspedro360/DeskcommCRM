@@ -45,9 +45,10 @@ export const ROTULO_POR_INDICADOR: Record<string, string> = {
   "offsite_conversion.fb_pixel_complete_registration": "Registros concluídos",
   "offsite_conversion.fb_pixel_add_to_cart": "Adições ao carrinho",
   "offsite_conversion.fb_pixel_initiate_checkout": "Checkouts iniciados",
-  onsite_conversion_lead_grouped: "Cadastros",
-  lead: "Cadastros",
-  leadgen_grouped: "Cadastros de formulário",
+  "onsite_conversion.lead_grouped": "Leads de formulário",
+  onsite_conversion_lead_grouped: "Leads de formulário",
+  lead: "Leads de formulário",
+  leadgen_grouped: "Leads de formulário",
   link_click: "Cliques no link",
   landing_page_view: "Visualizações da página",
   post_engagement: "Engajamentos",
@@ -173,10 +174,10 @@ const TIPOS_DE_VISUALIZACAO_DA_PAGINA = [
 /**
  * Envios de formulário Lead Ads que a Meta pode devolver dentro de `actions`.
  *
- * Resultado da campanha não serve como fonte desta coluna: em campanhas de
- * WhatsApp, por exemplo, ele representa conversas iniciadas. A contagem de
- * formulários permanece separada para que as duas origens de lead não sejam
- * misturadas.
+ * A Meta pode expor essa métrica em `actions` ou em `results`, dependendo do
+ * objetivo e da conta. Quando ela vier em `results`, só é aceita se o
+ * indicador for um destes tipos de formulário, para não misturar conversas de
+ * WhatsApp com leads de formulário.
  */
 const TIPOS_DE_LEAD_DE_FORMULARIO = [
   "leadgen_grouped",
@@ -205,8 +206,18 @@ export function valorDaAcao(
 }
 
 /** Retorna somente os leads que enviaram formulário nativo da Meta. */
-export function leadsGeradosDeFormulario(acoes: AcaoDaPlataforma[] | undefined): number | null {
-  return valorDaAcao(acoes, TIPOS_DE_LEAD_DE_FORMULARIO);
+export function leadsGeradosDeFormulario(
+  acoes: AcaoDaPlataforma[] | undefined,
+  resultados?: MetricaIndicada[] | undefined,
+): number | null {
+  const porAcao = valorDaAcao(acoes, TIPOS_DE_LEAD_DE_FORMULARIO);
+  if (porAcao !== null) return porAcao;
+
+  const resultado = valorIndicado(resultados);
+  const indicador = limparIndicador(resultado.indicador);
+  return indicador && TIPOS_DE_LEAD_DE_FORMULARIO.includes(indicador as never)
+    ? resultado.valor
+    : null;
 }
 
 /**
@@ -320,7 +331,7 @@ export function montarTabelaDeCampanhas(
       veiculacao: campanha?.effective_status ?? null,
       objetivo: campanha?.objective ?? null,
       resultado: extrairResultado(insight),
-      leadsGerados: leadsGeradosDeFormulario(insight.actions),
+      leadsGerados: leadsGeradosDeFormulario(insight.actions, insight.results),
       gasto: numeroOuNulo(insight.spend),
       impressoes,
       alcance: numeroOuNulo(insight.reach),

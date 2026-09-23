@@ -47,23 +47,29 @@ const querySchema = z
     path: ["from"],
   });
 
-/** AAAA-MM-DD em UTC. */
-function comoData(d: Date): string {
-  return d.toISOString().slice(0, 10);
+/** Dia civil de São Paulo, no formato que o `time_range` da Meta aceita. */
+function hojeEmSaoPaulo(): string {
+  const partes = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const valor = (tipo: Intl.DateTimeFormatPartTypes) =>
+    partes.find((parte) => parte.type === tipo)?.value;
+  return `${valor("year")}-${valor("month")}-${valor("day")}`;
 }
 
-/**
- * Últimos 7 dias, terminando ONTEM.
- *
- * Não termina hoje de propósito: o dia corrente está incompleto e a plataforma
- * ainda reprocessa atribuição dele por horas. Incluí-lo faria o CPA de hoje
- * parecer alto de manhã e melhorar sozinho à tarde — um número que muda sem
- * ninguém mexer em nada é o que ensina o operador a não confiar na tela.
- */
+function adicionarDias(data: string, dias: number): string {
+  const partes = data.split("-").map(Number);
+  const resultado = new Date(Date.UTC(partes[0]!, partes[1]! - 1, partes[2]! + dias));
+  return resultado.toISOString().slice(0, 10);
+}
+
+/** Últimos 7 dias corridos, incluindo o dia atual. */
 function periodoPadrao(): { from: string; to: string } {
-  const ontem = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const seteDiasAntes = new Date(ontem.getTime() - 6 * 24 * 60 * 60 * 1000);
-  return { from: comoData(seteDiasAntes), to: comoData(ontem) };
+  const hoje = hojeEmSaoPaulo();
+  return { from: adicionarDias(hoje, -6), to: hoje };
 }
 
 export async function GET(req: NextRequest): Promise<Response> {

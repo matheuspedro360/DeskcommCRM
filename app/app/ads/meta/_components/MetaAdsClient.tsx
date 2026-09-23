@@ -72,18 +72,27 @@ const STATUS_DA_CONTA: Record<number, string> = {
 };
 
 function comoData(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  const ano = d.getFullYear();
+  const mes = String(d.getMonth() + 1).padStart(2, "0");
+  const dia = String(d.getDate()).padStart(2, "0");
+  return `${ano}-${mes}-${dia}`;
 }
 
-/** Ontem — nunca hoje. O dia corrente está incompleto e a plataforma ainda o reprocessa. */
-function ontem(): Date {
-  return new Date(Date.now() - 24 * 60 * 60 * 1000);
+function adicionarDias(data: Date, dias: number): Date {
+  const resultado = new Date(data);
+  resultado.setDate(resultado.getDate() + dias);
+  return resultado;
 }
 
 function haDias(dias: number): { de: string; ate: string } {
-  const fim = ontem();
-  const inicio = new Date(fim.getTime() - (dias - 1) * 24 * 60 * 60 * 1000);
+  const fim = new Date();
+  const inicio = adicionarDias(fim, -(dias - 1));
   return { de: comoData(inicio), ate: comoData(fim) };
+}
+
+function dataParaExibir(data: string, idioma: string): string {
+  const partes = data.split("-").map(Number);
+  return new Date(partes[0]!, partes[1]! - 1, partes[2]!).toLocaleDateString(idioma);
 }
 
 const PERSONALIZADO = "personalizado";
@@ -95,8 +104,6 @@ interface Props {
 
 export function MetaAdsClient({ contaPadrao }: Props) {
   const t = useT();
-  // O carimbo "lido em" é uma DATA, e data segue o idioma de quem lê — fixar
-  // "pt-BR" deixaria a tela em espanhol com a hora em português.
   const tagDoIdioma = useTagDeIdioma();
 
   const [conta, setConta] = useState<string | null>(contaPadrao);
@@ -209,7 +216,7 @@ export function MetaAdsClient({ contaPadrao }: Props) {
                 className="w-40"
                 value={intervalo.ate}
                 min={intervalo.de}
-                max={comoData(ontem())}
+                max={comoData(new Date())}
                 onChange={(e) => setIntervalo((i) => ({ ...i, ate: e.target.value }))}
               />
             </div>
@@ -250,14 +257,9 @@ export function MetaAdsClient({ contaPadrao }: Props) {
             moeda={moeda}
             avisos={campanhas.data.data.avisos}
           />
-          {/*
-            Sem carimbo, uma tabela que falhou ao atualizar é visualmente
-            idêntica a uma recém-atualizada — e a promessa desta tela é
-            justamente "número de agora".
-          */}
           <p className="text-xs text-muted-foreground">
-            {t("Período")}: {intervalo.de} {t("a")} {intervalo.ate} · {t("lido em")}{" "}
-            {new Date(campanhas.data.data.lido_em).toLocaleString(tagDoIdioma)}
+            {t("Período")}: {dataParaExibir(intervalo.de, tagDoIdioma)} {t("a")} {" "}
+            {dataParaExibir(intervalo.ate, tagDoIdioma)}
           </p>
         </>
       )}
