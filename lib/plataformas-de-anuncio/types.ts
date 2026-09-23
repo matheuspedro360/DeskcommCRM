@@ -259,6 +259,11 @@ export interface LinhaDeCampanha {
   veiculacao: string | null;
   objetivo: string | null;
   resultado: ResultadoDaCampanha;
+  /**
+   * Envios de formulário de geração de cadastro da Meta. Fica separado de
+   * `resultado`, pois este pode representar conversas iniciadas no WhatsApp.
+   */
+  leadsGerados: number | null;
   gasto: number | null;
   impressoes: number | null;
   alcance: number | null;

@@ -171,6 +171,21 @@ const TIPOS_DE_VISUALIZACAO_DA_PAGINA = [
 ] as const;
 
 /**
+ * Envios de formulário Lead Ads que a Meta pode devolver dentro de `actions`.
+ *
+ * Resultado da campanha não serve como fonte desta coluna: em campanhas de
+ * WhatsApp, por exemplo, ele representa conversas iniciadas. A contagem de
+ * formulários permanece separada para que as duas origens de lead não sejam
+ * misturadas.
+ */
+const TIPOS_DE_LEAD_DE_FORMULARIO = [
+  "leadgen_grouped",
+  "onsite_conversion.lead_grouped",
+  "onsite_conversion_lead_grouped",
+  "lead",
+] as const;
+
+/**
  * O valor de UMA ação pelo `action_type`, ou `null`.
  *
  * Não é `somaDeAcoes`: aqui a lista é heterogênea, e somar misturaria cliques
@@ -187,6 +202,11 @@ export function valorDaAcao(
     if (n !== null) return n;
   }
   return null;
+}
+
+/** Retorna somente os leads que enviaram formulário nativo da Meta. */
+export function leadsGeradosDeFormulario(acoes: AcaoDaPlataforma[] | undefined): number | null {
+  return valorDaAcao(acoes, TIPOS_DE_LEAD_DE_FORMULARIO);
 }
 
 /**
@@ -300,6 +320,7 @@ export function montarTabelaDeCampanhas(
       veiculacao: campanha?.effective_status ?? null,
       objetivo: campanha?.objective ?? null,
       resultado: extrairResultado(insight),
+      leadsGerados: leadsGeradosDeFormulario(insight.actions),
       gasto: numeroOuNulo(insight.spend),
       impressoes,
       alcance: numeroOuNulo(insight.reach),
@@ -322,6 +343,7 @@ export function montarTabelaDeCampanhas(
       veiculacao: campanha.effective_status ?? null,
       objetivo: campanha.objective ?? null,
       resultado: { valor: null, custoPorResultado: null, indicador: null },
+      leadsGerados: null,
       gasto: null,
       impressoes: null,
       alcance: null,

@@ -6,6 +6,7 @@ import {
   calcularConnectRate,
   calcularHookRate,
   custoPorResultado,
+  leadsGeradosDeFormulario,
   montarTabelaDeCampanhas,
   numeroOuNulo,
   rotuloDoIndicador,
@@ -296,6 +297,32 @@ describe("rótulo do indicador", () => {
 
   it("indicador ausente é nulo, não string vazia", () => {
     expect(rotuloDoIndicador(null)).toBeNull();
+  });
+});
+
+describe("leads gerados por formulário", () => {
+  it("separa formulário de conversas iniciadas", () => {
+    const acoes = [
+      { action_type: "onsite_conversion.messaging_conversation_started_7d", value: "8" },
+      { action_type: "leadgen_grouped", value: "5" },
+    ];
+
+    expect(leadsGeradosDeFormulario(acoes)).toBe(5);
+    expect(valorDaAcao(acoes)).toBeNull();
+  });
+
+  it("aceita as variantes de formulário que a Meta devolve", () => {
+    expect(
+      leadsGeradosDeFormulario([{ action_type: "onsite_conversion.lead_grouped", value: "4" }]),
+    ).toBe(4);
+    expect(
+      leadsGeradosDeFormulario([{ action_type: "onsite_conversion_lead_grouped", value: "3" }]),
+    ).toBe(3);
+  });
+
+  it("mantém a contagem vazia quando a plataforma não devolveu ação de formulário", () => {
+    const linha = linhaDoInsight(COM_CONNECT_RATE);
+    expect(linha.leadsGerados).toBeNull();
   });
 });
 
