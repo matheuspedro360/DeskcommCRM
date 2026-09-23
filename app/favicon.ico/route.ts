@@ -6,6 +6,8 @@ import { type NextRequest, NextResponse } from "next/server";
  * uma atualização de aba transforme o pedido automático em 404.
  */
 export function GET(request: NextRequest): NextResponse {
-  return NextResponse.redirect(new URL("/icon", request.url), 308);
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  const protocolo = request.headers.get("x-forwarded-proto") ?? "https";
+  const origemPublica = host ? `${protocolo}://${host.split(",")[0]}` : request.nextUrl.origin;
+  return NextResponse.redirect(new URL("/icon", origemPublica), 308);
 }
-
