@@ -2539,16 +2539,38 @@ async function executarTurnoDoAgente(
   // — medido num tenant de produção: caso aberto, funil parado em "Novo contato".
   // Nunca bloqueia nem derruba o turno — mesma disciplina de `triggerHandoff` (G1-G4),
   // que já chama o mesmo helper para o handoff por palavra-chave do cliente.
-  const moverParaHandoffBestEffort = (reason: string): void => {
-    moverLeadParaEtapaDeHandoff(createAdminClient(), {
-      organizationId: tenantId,
-      leadId,
-      reason,
-    }).catch((err) => {
+  const moverParaHandoffBestEffort = async (reason: string): Promise<void> => {
+    try {
+      // Neste motor `leadId` é o ID do contato, não de crm_leads. Resolver o
+      // negócio aberto evita tentar mover um contato como se fosse um card.
+      const admin = createAdminClient();
+      const { data: negocio, error } = await admin.from('crm_leads')
+        .select('id')
+        .eq('organization_id', tenantId)
+        .eq('contact_id', leadId)
+        .eq('status', 'open')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error || !negocio?.id) {
+        runLog.warn('negócio aberto não encontrado para movimento de handoff', {
+          error: error?.message ?? 'sem_negocio_aberto',
+        });
+        return;
+      }
+      const movimento = await moverLeadParaEtapaDeHandoff(admin, {
+        organizationId: tenantId,
+        leadId: negocio.id,
+        reason,
+      });
+      if (!movimento.moveu && movimento.motivo !== 'ja_esta_la' && movimento.motivo !== 'sem_etapa_de_handoff') {
+        runLog.warn('movimento de handoff não aplicado', { motivo: movimento.motivo });
+      }
+    } catch (err) {
       runLog.warn('moverLeadParaEtapaDeHandoff falhou (best-effort, caso humano)', {
         error: err instanceof Error ? err.message : String(err),
       });
-    });
+    }
   };
   // Arma o `agendaStallGate` (before-send.ts): true assim que crm_find_free_slots,
   // crm_book_appointment ou crm_reschedule_appointment executar neste turno — marcado no
@@ -3058,7 +3080,7 @@ async function executarTurnoDoAgente(
               return { ok: false, error: { code: chain.code, message: chain.message } };
             }
             openedCaseThisTurn = true;
-            moverParaHandoffBestEffort('case_promise_autofallback');
+            await moverParaHandoffBestEffort('case_promise_autofallback');
             // Re-roda a cadeia INTEIRA agora que há caso aberto — o send real acontece
             // DENTRO do runBeforeSend (via args.send); nunca chamamos o canal por fora
             // (perderia pacing/lgpd/stop). ponytail: re-roda a cadeia inteira no fail-safe
@@ -3510,7 +3532,7 @@ async function executarTurnoDoAgente(
           );
           if (!res.ok) return res;
           openedCaseThisTurn = true;
-          moverParaHandoffBestEffort('open_human_case');
+          await moverParaHandoffBestEffort('open_human_case');
           // ACH-03: a expectativa vai junto com a confirmação. Medido num turno
           // real: o agente abria o caso e prometia ao cliente que "alguém entra
           // em contato" sem nunca ter olhado se havia alguém — a capacidade de
