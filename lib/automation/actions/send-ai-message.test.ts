@@ -48,12 +48,20 @@ const gerarAbordagemDeFormulario = vi.fn();
 const ensureConversation = vi.fn();
 const sendMessageHandler = vi.fn();
 const espacarEnvio = vi.fn();
+const dadosDoFormularioDoContexto = vi.fn();
+const sincronizaEstagioDoAgente = vi.fn();
 
 // A chamada PAGA ao modelo. Ela ser observável é metade do teste: a guarda
 // promete parar antes do gasto, e "parou antes" só se mede vendo o gasto não
 // acontecer.
 vi.mock("@/lib/agent-engine/agent/abordagem-de-formulario", () => ({
   gerarAbordagemDeFormulario: (...args: unknown[]) => gerarAbordagemDeFormulario(...args),
+}));
+vi.mock("@/lib/automation/dados-do-formulario", () => ({
+  dadosDoFormularioDoContexto: (...args: unknown[]) => dadosDoFormularioDoContexto(...args),
+}));
+vi.mock("@/lib/leads/agent-stage-sync", () => ({
+  sincronizaEstagioDoAgente: (...args: unknown[]) => sincronizaEstagioDoAgente(...args),
 }));
 // `SUPABASE_DB_URL` não existe na suíte unitária, e sem isto a ação sai por
 // `ia_indisponivel` antes de chegar a qualquer coisa que importe.
@@ -172,7 +180,9 @@ function executar(admin: ActionCtx["admin"], telefone: string): Promise<ActionRe
 
 beforeEach(() => {
   vi.clearAllMocks();
-  gerarAbordagemDeFormulario.mockResolvedValue({ ok: true, texto: "Oi! Em que bairro você procura?" });
+  gerarAbordagemDeFormulario.mockResolvedValue({ ok: true, texto: "Oi! Em que bairro você procura?", pipelineIds: ["funil-1"] });
+  dadosDoFormularioDoContexto.mockResolvedValue({ dados: {}, origem: null, origemDaAbordagem: "automacao" });
+  sincronizaEstagioDoAgente.mockResolvedValue({ moveu: true, motivo: "movido" });
   ensureConversation.mockResolvedValue("conversa-1");
   sendMessageHandler.mockResolvedValue({ id: "mensagem-1", status: "sent" });
   espacarEnvio.mockResolvedValue(undefined);
@@ -207,6 +217,33 @@ describe("send_ai_message em canal no modo de teste — número FORA da lista", 
 });
 
 describe("send_ai_message — quem PODE receber continua recebendo", () => {
+  it("move apenas formulário enviado com sucesso, do passo novo ao contatado", async () => {
+    dadosDoFormularioDoContexto.mockResolvedValue({ dados: { nome: "Teste" }, origem: "Meta", origemDaAbordagem: "formulario" });
+    const { cliente } = bancoFalso({ metadata: { ai_gate: "open" } });
+
+    const r = await executar(cliente, NUMERO_DE_TESTE);
+
+    expect(r.status).toBe("success");
+    expect(sincronizaEstagioDoAgente).toHaveBeenCalledWith(cliente, {
+      organizationId: ORG,
+      contactId: "contato-1",
+      passo: "contacted",
+      escopoDeFunis: ["funil-1"],
+      somenteSePassoAtual: "new",
+    });
+    expect(r.detail?.movimento_do_card).toBe("movido");
+  });
+
+  it("não move card quando a mensagem do formulário ficou enfileirada", async () => {
+    dadosDoFormularioDoContexto.mockResolvedValue({ dados: {}, origem: "Meta", origemDaAbordagem: "formulario" });
+    sendMessageHandler.mockResolvedValue({ id: "mensagem-1", status: "queued" });
+    const { cliente } = bancoFalso({ metadata: { ai_gate: "open" } });
+
+    const r = await executar(cliente, NUMERO_DE_TESTE);
+
+    expect(r.status).toBe("postponed");
+    expect(sincronizaEstagioDoAgente).not.toHaveBeenCalled();
+  });
   it("número cadastrado passa, mesmo cadastrado com o nono dígito e gravado sem ele", async () => {
     // Anti-vacuidade: sem este caso, uma ação que nunca envia nada satisfaria o
     // bloco acima inteiro. E o nono dígito é o caso real — o operador cadastra

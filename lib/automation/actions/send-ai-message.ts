@@ -32,6 +32,7 @@ import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { autorizarContatoParaIA } from "@/lib/ai/elegibilidade/autorizacao";
 import { decidirPreGoLiveDoCanalViaSupabase } from "@/lib/ai/elegibilidade/consulta-pre-go-live";
+import { sincronizaEstagioDoAgente } from "@/lib/leads/agent-stage-sync";
 
 const TIPO = "send_ai_message";
 
@@ -106,6 +107,7 @@ async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise
   try { boundary = await serviceForAutomation(ctx, contact.id, sessionId); }
   catch (error) { return { type: TIPO, status: "failed", error: error instanceof Error ? error.message : String(error) }; }
   let texto: string;
+  let pipelineIds: string[];
   try {
     await assertAgendaEffectSupabase(ctx.admin, { organizationId: ctx.organizationId, contactId: contact.id });
     const gerado = await gerarAbordagemDeFormulario(pool, llmEdgeConfigFromEnv(env), {
@@ -121,6 +123,7 @@ async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise
       return { type: TIPO, status: "failed", error: gerado.reason, detail: { reason: gerado.reason } };
     }
     texto = gerado.texto;
+    pipelineIds = gerado.pipelineIds;
   } catch (err) {
     // Teto de gasto atingido, credencial inválida, provider fora. A causa vai
     // inteira para o registro do run — é o que a tela mostra a quem pergunta
@@ -173,6 +176,35 @@ async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise
     // saber SE a instrução que escreveu produziu a mensagem que queria — e
     // ajustar a instrução às cegas é o que faz o dono desistir da IA.
     desfecho.detail = { ...(desfecho.detail ?? {}), texto_gerado: texto };
+    // O primeiro contato escrito pela IA só vira "Atendimento IA" quando o
+    // canal confirmou o envio. Não move uma mensagem enfileirada/falha, nem
+    // regride um card que já saiu de "Leads novos" por ação humana ou da IA.
+    if (origemDaAbordagem === "formulario" && desfecho.status === "success") {
+      try {
+        const movimento = await sincronizaEstagioDoAgente(ctx.admin, {
+          organizationId: ctx.organizationId,
+          contactId: contact.id,
+          passo: "contacted",
+          escopoDeFunis: pipelineIds,
+          somenteSePassoAtual: "new",
+        });
+        desfecho.detail = { ...desfecho.detail, movimento_do_card: movimento.motivo };
+        if (!movimento.moveu && movimento.motivo !== "ja_esta_la" && movimento.motivo !== "origem_divergente") {
+          logger.warn("[automation.send_ai_message] mensagem saiu, mas card não avançou", {
+            organizationId: ctx.organizationId,
+            ruleId: ctx.ruleId,
+            motivo: movimento.motivo,
+          });
+        }
+      } catch (err) {
+        logger.error("[automation.send_ai_message] mensagem saiu, mas sincronização do card falhou", {
+          organizationId: ctx.organizationId,
+          ruleId: ctx.ruleId,
+          causa: err instanceof Error ? err.message : String(err),
+        });
+        desfecho.detail = { ...desfecho.detail, movimento_do_card: "indisponivel" };
+      }
+    }
     return desfecho;
   } catch (err) {
     return {
