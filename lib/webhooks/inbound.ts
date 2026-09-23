@@ -13,8 +13,8 @@ export interface FieldMap {
 }
 
 const DEFAULT_FIELD_MAP: Required<FieldMap> = {
-  name: ["name", "nome", "full_name", "fullname"],
-  phone: ["phone", "telefone", "whatsapp", "celular", "phone_number", "tel"],
+  name: ["name", "nome", "full_name", "fullname", "nome_completo"],
+  phone: ["phone", "telefone", "whatsapp", "celular", "phone_number", "tel", "numero_do_whatsapp", "número_do_whatsapp"],
   email: ["email", "e-mail", "mail"],
 };
 

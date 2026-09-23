@@ -4,7 +4,13 @@ import { describe, expect, it, vi } from "vitest";
 // o mock corta a cadeia sem tocar no que está sob teste.
 vi.mock("@/lib/audit", () => ({ audit: vi.fn() }));
 
-import { dispatchWahaEvent, parseChatId, type WahaEnvelope, type WahaPayload } from "@/lib/waha/ingest";
+import {
+  dispatchWahaEvent,
+  pareceSaudacaoAutomaticaDoWhatsapp,
+  parseChatId,
+  type WahaEnvelope,
+  type WahaPayload,
+} from "@/lib/waha/ingest";
 
 /**
  * A MENSAGEM QUE O DONO DIGITA NO CELULAR TEM QUE CHEGAR NO CRM.
@@ -241,6 +247,24 @@ describe("mensagem digitada no celular do dono (fromMe)", () => {
     const contato = rpcs.find((c) => c.fn === "fn_upsert_wa_contact");
     expect(contato, "o contato do cliente nem foi criado").toBeDefined();
     expect(contato!.args.p_notify, "outbound batizou o cliente com o nome do operador").toBeNull();
+  });
+});
+
+describe("saudação automática do WhatsApp Business", () => {
+  it("não confunde a saudação-padrão com atendimento humano", () => {
+    expect(
+      pareceSaudacaoAutomaticaDoWhatsapp(
+        "Luiz Carlos Lima agradece seu contato. Como podemos ajudar?",
+      ),
+    ).toBe(true);
+  });
+
+  it("mantém uma resposta comercial real como atendimento humano", () => {
+    expect(
+      pareceSaudacaoAutomaticaDoWhatsapp(
+        "Olá, Diego. Vi seu formulário e vou verificar os valores atualizados para você.",
+      ),
+    ).toBe(false);
   });
 });
 
