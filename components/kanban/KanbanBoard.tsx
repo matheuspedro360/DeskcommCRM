@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
 import { useT } from "@/hooks/i18n/useT";
 import { Card } from "@/components/ui/card";
@@ -126,6 +126,8 @@ export function KanbanBoard({
   // aberto, o estado local manda (fechar não reabre pela URL).
   const [dossieId, setDossieId] = useState<string | null>(leadInicial ?? null);
   const [internalSelected, setInternalSelected] = useState<Set<string>>(new Set());
+  const boardRef = useRef<HTMLDivElement>(null);
+  const [horizontalScroll, setHorizontalScroll] = useState({ position: 0, max: 0 });
   const selectedLeadIds = useMemo(
     () => (selectedIds ? new Set(selectedIds) : internalSelected),
     [selectedIds, internalSelected],
@@ -150,6 +152,26 @@ export function KanbanBoard({
     if (!data) return null;
     return groupLeadsByStage(data.stages, data.leads);
   }, [data]);
+
+  // A barra nativa fica no fim de colunas potencialmente muito altas. Este
+  // controle permanece acima dos cards e acompanha também a rolagem por mouse.
+  useEffect(() => {
+    const board = boardRef.current;
+    if (!board) return;
+    const measure = () => {
+      const max = Math.max(0, board.scrollWidth - board.clientWidth);
+      setHorizontalScroll((previous) => {
+        const position = Math.min(board.scrollLeft, max);
+        return previous.position === position && previous.max === max
+          ? previous
+          : { position, max };
+      });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(board);
+    return () => observer.disconnect();
+  }, [data?.stages.length]);
 
   // Um conjunto por vez, e não um card por vez: o board recebe o resultado do
   // gesto já resolvido pela coluna (um card, um intervalo, a etapa inteira). A
@@ -245,7 +267,39 @@ export function KanbanBoard({
 
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
-      <div className="flex h-full gap-3 overflow-x-auto p-4">
+      {horizontalScroll.max > 0 && (
+        <div className="sticky top-0 z-10 flex items-center gap-3 bg-background px-4 py-3 text-xs text-text-muted">
+          <label htmlFor="kanban-horizontal-scroll" className="shrink-0">
+            {t("Percorrer etapas do funil")}
+          </label>
+          <input
+            id="kanban-horizontal-scroll"
+            data-testid="kanban-horizontal-scroll"
+            type="range"
+            min={0}
+            max={horizontalScroll.max}
+            value={horizontalScroll.position}
+            onChange={(event) => {
+              const position = Number(event.target.value);
+              const board = boardRef.current;
+              if (board) board.scrollLeft = position;
+              setHorizontalScroll((previous) => ({ ...previous, position }));
+            }}
+            className="kanban-horizontal-range min-w-0 flex-1"
+          />
+        </div>
+      )}
+      <div
+        ref={boardRef}
+        data-testid="kanban-board-scroll"
+        onScroll={(event) => {
+          const position = event.currentTarget.scrollLeft;
+          setHorizontalScroll((previous) =>
+            previous.position === position ? previous : { ...previous, position },
+          );
+        }}
+        className="flex h-full gap-3 overflow-x-auto p-4"
+      >
         {data.stages.map((stage) => (
           <StageColumn
             key={stage.id}

@@ -72,6 +72,28 @@ test("filtro por responsável reflete na URL e esconde leads com dono", async ({
   await expect(owned).toHaveCount(0);
 });
 
+test("a barra horizontal acima dos cards alcança o fim do funil", async ({ page }) => {
+  await page.setViewportSize({ width: 700, height: 600 });
+  await login(page, creds.users.manager!.email);
+  await page.goto(`/app/pipelines/${creds.kanban!.pipeline_id}`);
+
+  const board = page.getByTestId("kanban-board-scroll");
+  const slider = page.getByRole("slider", { name: "Percorrer etapas do funil" });
+  await expect(slider).toBeVisible();
+  await expect.poll(() => board.evaluate((element) => element.scrollLeft)).toBe(0);
+
+  await slider.focus();
+  await slider.press("End");
+  await expect.poll(() => board.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+  await expect.poll(() => board.evaluate((element) =>
+    Math.abs(element.scrollWidth - element.clientWidth - element.scrollLeft),
+  )).toBeLessThan(2);
+
+  // O controle também acompanha a rolagem do quadro pelo mouse.
+  await board.evaluate((element) => { element.scrollLeft = 0; });
+  await expect(slider).toHaveValue("0");
+});
+
 /**
  * #916 / PR #919 — arrastar o MESMO card duas vezes seguidas, pela tela.
  *
