@@ -148,6 +148,7 @@ export interface ResultadoDaSincronizacao {
     | "sem_negocio"
     | "ambiguo"
     | "conflito_humano"
+    | "origem_divergente"
     /**
      * O negócio está num funil que este agente não cuida (spec 17 passo 3).
      *
@@ -203,6 +204,8 @@ export async function sincronizaEstagioDoAgente(
      * caminho que ainda não foi migrado, em silêncio.
      */
     escopoDeFunis?: readonly string[];
+    /** Evita regredir um card que já saiu do passo esperado. */
+    somenteSePassoAtual?: string;
   },
 ): Promise<ResultadoDaSincronizacao> {
   // ⚠️ O erro do SELECT É LIDO, e isso não é zelo: o supabase-js NÃO LANÇA em
@@ -274,6 +277,13 @@ export async function sincronizaEstagioDoAgente(
   // hint nenhum = "sem_mapeamento", e o incidente se disfarça de configuração.
   if (erroStages) {
     return { moveu: false, motivo: "indisponivel", leadId: lead.id, detalhe: erroStages.message };
+  }
+
+  if (input.somenteSePassoAtual !== undefined) {
+    const etapaAtual = (stageRows ?? []).find((stage) => stage.id === lead.stage_id);
+    if (etapaAtual?.agent_stage_hint !== input.somenteSePassoAtual) {
+      return { moveu: false, motivo: "origem_divergente", leadId: lead.id };
+    }
   }
 
   const destino = resolveDestinoDoAgente(

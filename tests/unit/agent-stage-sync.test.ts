@@ -201,6 +201,35 @@ async function sincronizaObservando(c: Cenario) {
 describe("sincronizaEstagioDoAgente", () => {
   beforeEach(() => vi.mocked(emitLeadActivity).mockClear());
 
+  it("não regride card já contatado quando a abordagem inicial é repetida", async () => {
+    const r = await sincronizaEstagioDoAgente(fakeAdmin(cenario()), {
+      organizationId: ORG,
+      contactId: CONTATO,
+      passo: "contacted",
+      somenteSePassoAtual: "new",
+    });
+    expect(r).toMatchObject({ moveu: false, motivo: "origem_divergente" });
+    expect(vi.mocked(emitLeadActivity)).not.toHaveBeenCalled();
+  });
+
+  it("move do passo novo ao contatado quando a abordagem foi enviada", async () => {
+    const novo = { ...LEAD, stage_id: "novo" };
+    const stages = [
+      { id: "novo", name: "Leads novos", agent_stage_hint: "new", is_archived: false },
+      { id: "s1", name: "Atendimento IA", agent_stage_hint: "contacted", is_archived: false },
+    ];
+    const r = await sincronizaEstagioDoAgente(fakeAdmin(cenario({
+      leads: { data: [novo], error: null },
+      stages: { data: stages, error: null },
+    })), {
+      organizationId: ORG,
+      contactId: CONTATO,
+      passo: "contacted",
+      somenteSePassoAtual: "new",
+    });
+    expect(r).toMatchObject({ moveu: true, motivo: "movido", stageName: "Atendimento IA" });
+  });
+
   it("caminho feliz: move e emite UMA atividade", async () => {
     const r = await sincroniza(cenario());
     expect(r).toMatchObject({ moveu: true, motivo: "movido", stageName: "Proposta enviada" });
