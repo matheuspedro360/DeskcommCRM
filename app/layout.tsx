@@ -98,13 +98,13 @@ export async function generateMetadata(): Promise<Metadata> {
       "multi-tenant",
     ],
     robots: { index: false, follow: false },
-    // Sem esta linha o navegador pede `/favicon.ico`, que não existe: medido em
-    // produção, o 404 é a `app/not-found.tsx` INTEIRA (19.435 bytes de HTML)
-    // servida para um pedido de ícone, em toda navegação sem cache. Declarar
-    // `/icon` faz o pedido ir para `app/icon.tsx`, que desenha a marca da
-    // instalação em runtime — ver o cabeçalho daquele arquivo para por que ele
-    // não pode ser um arquivo estático em `public/`.
-    icons: { icon: "/icon" },
+    // O símbolo oficial da Decola é fixo na aba. O fallback `/favicon.ico`
+    // também aponta para este mesmo arquivo para cobrir navegadores antigos.
+    icons: {
+      icon: [{ url: "/decola-ai-symbol.svg", type: "image/svg+xml" }],
+      shortcut: "/decola-ai-symbol.svg",
+      apple: "/decola-ai-symbol.svg",
+    },
   };
 }
 
