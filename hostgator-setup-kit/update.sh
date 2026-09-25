@@ -21,12 +21,13 @@ source "$KIT_DIR/_common.sh"
 source "$KIT_DIR/manutencao.sh"
 enter_project
 
-FORCE=""; SKIP_BACKUP=""; TARGET_TAG=""
+FORCE=""; SKIP_BACKUP=""; TARGET_TAG=""; ALLOW_FRONTEND_CHANGE=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --force) FORCE=1 ;;
     --skip-backup) SKIP_BACKUP=1 ;;
     --to) shift; TARGET_TAG="$1" ;;
+    --allow-frontend-change) ALLOW_FRONTEND_CHANGE=1 ;;
   esac
   shift
 done
@@ -36,6 +37,16 @@ done
 # parque com o .env DELA. Foi o que deixou o WhatsApp de uma VPS real três dias
 # em 401. Ver `recusar_projeto_de_outra_arvore` em _common.sh.
 recusar_projeto_de_outra_arvore || die "Atualização interrompida para não quebrar a instalação que está no ar."
+
+# A instalação Decola Aí mantém marca e fluxos próprios nas imagens locais.
+# Um update automático para imagens upstream removeria essas customizações.
+# Exigir revisão explícita antes de tocar em banco, código ou contêineres.
+case "${APP_IMAGE:-}" in
+  deskcomm-app:decola-*|ghcr.io/melgarafael/deskcommcrm:*-decola)
+    [ -n "$ALLOW_FRONTEND_CHANGE" ] || refuse "Esta instalação usa a interface personalizada da Decola Aí.
+     Atualização interrompida antes de alterar banco, código ou contêineres.
+     Para uma troca já revisada, execute novamente com --allow-frontend-change." ;;
+esac
 
 # Single-server: o Supabase desta VPS também tem dono. E o e-mail de acesso
 # (GoTrue) acompanha o SMTP do CRM AQUI, antes da decisão de versão: é este
