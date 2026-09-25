@@ -98,8 +98,10 @@ describe("fiação — resposta manual pelo WhatsApp silencia o bot temporariame
     const i = FONTE_INGEST.indexOf("async function handleOutboundFromUserPhone(");
     const j = FONTE_INGEST.indexOf("async function handleAck(", i);
     const corpo = FONTE_INGEST.slice(i, j);
+    expect(corpo).toContain("const ecoDoCrm = await ehEcoDeEnvioNosso(");
+    expect(corpo).toContain("const saudacaoAutomatica = pareceSaudacaoAutomaticaDoWhatsapp(");
     expect(corpo).toMatch(
-      /if \(!\(await ehEcoDeEnvioNosso\([^)]*\)\)\) \{[\s\S]{0,300}?pausarIaPorAtendimentoManual\(/,
+      /if \(!ecoDoCrm && !saudacaoAutomatica\) \{[\s\S]{0,300}?pausarIaPorAtendimentoManual\(/,
     );
   });
 });
