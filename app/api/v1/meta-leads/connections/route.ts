@@ -6,6 +6,7 @@ import { fail, ok } from "@/lib/api/wrappers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { encryptWebhookSecret } from "@/lib/webhooks/secrets";
 import { audit } from "@/lib/audit";
+import { requireSupportWrite } from "@/lib/impersonate/support";
 
 const entrada = z.object({
   name: z.string().trim().min(2).max(120),
@@ -32,6 +33,8 @@ export async function POST(req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
   const authz = await requireRole("admin", { requestId, resource: "meta_lead_connections" });
   if (!authz.ok) return authz.response;
+  const supportDenied = await requireSupportWrite();
+  if (supportDenied) return supportDenied;
   const parsed = entrada.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return fail("validation_failed", "Dados inválidos.", 400, { requestId, details: parsed.error.flatten() });
   const admin = createAdminClient();

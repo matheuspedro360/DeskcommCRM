@@ -3,10 +3,12 @@ import * as React from "react";
 import { Eye, EyeSlash } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 
-const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
-  ({ className, type, ...props }, ref) => {
+type InputProps = React.ComponentProps<"input"> & { visibilityToggle?: boolean };
+
+const Input = React.forwardRef<HTMLInputElement, InputProps>(
+  ({ className, type, visibilityToggle = true, ...props }, ref) => {
     const [visivel, setVisivel] = React.useState(false);
-    const eSenha = type === "password";
+    const eSenha = type === "password" && visibilityToggle;
     const campo = (
       <input
         {...props}

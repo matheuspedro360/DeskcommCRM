@@ -37,6 +37,23 @@ import type { Idioma } from "./idiomas";
 type Traducoes = Record<string, Partial<Record<Exclude<Idioma, "pt-BR">, string>>>;
 
 export const DICIONARIO: Traducoes = {
+  "Conectar formulários da Meta": { es: "Conectar formularios de Meta" },
+  "Os leads dos formulários selecionados entrarão diretamente no funil desta empresa. As credenciais ficam cifradas e não voltam a aparecer.": { es: "Los leads de los formularios seleccionados entrarán directamente en el embudo de esta empresa. Las credenciales se cifran y no volverán a mostrarse." },
+  "Conexão criada. Cadastre estes dois dados no webhook": { es: "Conexión creada. Registra estos dos datos en el webhook" },
+  "do aplicativo da Meta:": { es: "de la aplicación de Meta:" },
+  "Guarde o token agora. Depois de fechar, ele não será exibido novamente.": { es: "Guarda el token ahora. Después de cerrar, no volverá a mostrarse." },
+  "ID da Página Decola Aí": { es: "ID de la página Decola Aí" },
+  "IDs dos formulários": { es: "ID de los formularios" },
+  "Separe por vírgula; vazio aceita todos": { es: "Separa con comas; vacío acepta todos" },
+  "Etapa de entrada": { es: "Etapa de entrada" },
+  "Token de acesso da Página": { es: "Token de acceso de la página" },
+  "Criar conexão": { es: "Crear conexión" },
+  "Mostrar": { es: "Mostrar" },
+  "Senha forte:": { es: "Contraseña segura:" },
+  "requisitos atendidos": { es: "requisitos cumplidos" },
+  "Pelo menos 8 caracteres": { es: "Al menos 8 caracteres" },
+  "Uma letra minúscula": { es: "Una letra minúscula" },
+  "Uma letra maiúscula": { es: "Una letra mayúscula" },
   "Sobre a empresa": { es: "Sobre la empresa" },
   "Não foi possível carregar o enriquecimento.": { es: "No se pudo cargar el enriquecimiento." },
   "Sem dados de enriquecimento para este contato.": { es: "Sin datos de enriquecimiento para este contacto." },

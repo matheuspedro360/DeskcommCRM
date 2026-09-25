@@ -134,6 +134,7 @@ export function ResetPasswordForm() {
         <div className="relative">
           <Input
             id="password"
+            visibilityToggle={false}
             type={showPassword ? "text" : "password"}
             autoComplete="new-password"
             autoFocus
@@ -161,6 +162,7 @@ export function ResetPasswordForm() {
         <div className="relative">
           <Input
             id="password_confirm"
+            visibilityToggle={false}
             type={showPasswordConfirm ? "text" : "password"}
             autoComplete="new-password"
             className="pr-12"

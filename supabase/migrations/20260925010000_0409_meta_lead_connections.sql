@@ -1,4 +1,4 @@
--- 0381: conexão nativa dos Formulários Instantâneos da Meta.
+-- 0409: conexão nativa dos Formulários Instantâneos da Meta.
 create table if not exists public.meta_lead_connections (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
