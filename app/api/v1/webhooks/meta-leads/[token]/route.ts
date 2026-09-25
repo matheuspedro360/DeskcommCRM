@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { decryptWebhookSecret } from "@/lib/webhooks/secrets";
 import { assinaturaMetaValida, buildContactConsentMeta, extrairConsentimentoMeta, extrairEventosMetaLeadgen, mapearDetalheDoLeadMeta } from "@/lib/webhooks/meta-leadgen";
 import { POST as receberWebhookGenerico } from "@/app/api/v1/webhooks/in/[token]/route";
+import { consultarLeadDaMeta } from "@/lib/channels/meta-leadgen";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -69,10 +70,7 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
       continue;
     }
     const source = c.webhook_sources as unknown as { path_token: string };
-    const resposta = await fetch(`https://graph.facebook.com/v25.0/${encodeURIComponent(evento.leadgen_id)}`, {
-      cache: "no-store",
-      headers: { Authorization: `Bearer ${pageToken}` },
-    });
+    const resposta = await consultarLeadDaMeta(evento.leadgen_id, pageToken);
     const detalheBruto = await resposta.json().catch(() => null);
     const detalhe = mapearDetalheDoLeadMeta(detalheBruto);
     const consentimento = extrairConsentimentoMeta(detalheBruto);
