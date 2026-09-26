@@ -9040,6 +9040,7 @@ export const DICIONARIO: Traducoes = {
   Campanha: { es: "Campaña" },
   Veiculação: { es: "Entrega" },
   "Custo por Resultado": { es: "Costo por Resultado" },
+  "Custo por lead": { es: "Costo por lead" },
   "Valor Gasto": { es: "Importe Gastado" },
   Impressões: { es: "Impresiones" },
   Alcance: { es: "Alcance" },

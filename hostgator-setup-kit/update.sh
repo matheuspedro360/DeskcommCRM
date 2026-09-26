@@ -42,7 +42,7 @@ recusar_projeto_de_outra_arvore || die "Atualização interrompida para não que
 # Um update automático para imagens upstream removeria essas customizações.
 # Exigir revisão explícita antes de tocar em banco, código ou contêineres.
 case "${APP_IMAGE:-}" in
-  deskcomm-app:decola-*|ghcr.io/melgarafael/deskcommcrm:*-decola)
+  deskcomm-app:decola-*|"${IMG_NS}/deskcommcrm:"*-decola)
     [ -n "$ALLOW_FRONTEND_CHANGE" ] || refuse "Esta instalação usa a interface personalizada da Decola Aí.
      Atualização interrompida antes de alterar banco, código ou contêineres.
      Para uma troca já revisada, execute novamente com --allow-frontend-change." ;;

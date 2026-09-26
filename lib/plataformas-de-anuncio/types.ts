@@ -259,6 +259,10 @@ export interface LinhaDeCampanha {
   veiculacao: string | null;
   objetivo: string | null;
   resultado: ResultadoDaCampanha;
+  /** Leads atribuídos pela Meta no período; nulo quando a métrica não veio. */
+  leads: number | null;
+  /** Gasto dividido pelos leads medidos, na moeda da conta. */
+  custoPorLead: number | null;
   gasto: number | null;
   impressoes: number | null;
   alcance: number | null;

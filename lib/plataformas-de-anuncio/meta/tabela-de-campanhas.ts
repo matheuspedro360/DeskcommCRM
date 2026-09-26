@@ -171,6 +171,31 @@ const TIPOS_DE_VISUALIZACAO_DA_PAGINA = [
 ] as const;
 
 /**
+ * A Meta pode devolver o mesmo cadastro em vários `action_type` na mesma linha.
+ * Escolhemos o primeiro indicador específico disponível: somá-los duplicaria
+ * o número de leads (na conta real, os cinco tipos vieram todos com 19).
+ */
+const TIPOS_DE_LEAD = [
+  "leadgen_grouped",
+  "onsite_conversion.lead_grouped",
+  "onsite_conversion.lead",
+  "offsite_conversion.fb_pixel_lead",
+  "lead",
+] as const;
+
+function indicadorDeLead(indicador: string | null): boolean {
+  const limpo = limparIndicador(indicador);
+  return limpo !== null && (TIPOS_DE_LEAD as readonly string[]).includes(limpo);
+}
+
+export function valorDeLeads(linha: LinhaDeInsightCrua): number | null {
+  const deAcoes = valorDaAcao(linha.actions, TIPOS_DE_LEAD);
+  if (deAcoes !== null) return deAcoes;
+  const resultado = valorIndicado(linha.results);
+  return indicadorDeLead(resultado.indicador) ? resultado.valor : null;
+}
+
+/**
  * O valor de UMA ação pelo `action_type`, ou `null`.
  *
  * Não é `somaDeAcoes`: aqui a lista é heterogênea, e somar misturaria cliques
@@ -233,13 +258,21 @@ function extrairResultado(linha: LinhaDeInsightCrua): ResultadoDaCampanha {
   const resultado = valorIndicado(linha.results);
   const custo = valorIndicado(linha.cost_per_result);
   const gasto = numeroOuNulo(linha.spend);
+  const leads = valorDeLeads(linha);
+  const usarLeads = resultado.valor === null && leads !== null &&
+    (resultado.indicador === null || indicadorDeLead(resultado.indicador));
+  const valor = usarLeads ? leads : resultado.valor;
 
   return {
-    valor: resultado.valor,
-    custoPorResultado: custoPorResultado(custo.valor, gasto, resultado.valor),
+    valor,
+    custoPorResultado: custoPorResultado(
+      usarLeads ? null : custo.valor,
+      gasto,
+      valor,
+    ),
     // O indicador de `results` manda; o de `cost_per_result` é o mesmo na
     // prática, e usá-lo como reserva cobre a linha que traz um e não o outro.
-    indicador: resultado.indicador ?? custo.indicador,
+    indicador: usarLeads ? "leadgen_grouped" : resultado.indicador ?? custo.indicador,
   };
 }
 
@@ -281,6 +314,8 @@ export function montarTabelaDeCampanhas(
     const campanha = porId.get(id);
 
     const impressoes = numeroOuNulo(insight.impressions);
+    const gasto = numeroOuNulo(insight.spend);
+    const leads = valorDeLeads(insight);
     const reproducoes = somaDeAcoes(insight.video_play_actions);
     // Os dois números do Connect rate vêm do MESMO payload de insights — ver
     // CAMPOS_DE_INSIGHTS: `actions` rotula a visualização da página e
@@ -300,7 +335,9 @@ export function montarTabelaDeCampanhas(
       veiculacao: campanha?.effective_status ?? null,
       objetivo: campanha?.objective ?? null,
       resultado: extrairResultado(insight),
-      gasto: numeroOuNulo(insight.spend),
+      leads,
+      custoPorLead: custoPorResultado(null, gasto, leads),
+      gasto,
       impressoes,
       alcance: numeroOuNulo(insight.reach),
       cpm: numeroOuNulo(insight.cpm),
@@ -322,6 +359,8 @@ export function montarTabelaDeCampanhas(
       veiculacao: campanha.effective_status ?? null,
       objetivo: campanha.objective ?? null,
       resultado: { valor: null, custoPorResultado: null, indicador: null },
+      leads: null,
+      custoPorLead: null,
       gasto: null,
       impressoes: null,
       alcance: null,
