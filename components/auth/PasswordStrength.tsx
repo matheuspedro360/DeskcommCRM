@@ -8,11 +8,17 @@ import { useT } from "@/hooks/i18n/useT";
 export function PasswordStrength({ password }: { password: string }) {
   const t = useT();
   const atendidos = requisitosAtendidos(password);
+  const classificacao =
+    atendidos === REQUISITOS_DA_SENHA.length ? "Forte" : atendidos >= 3 ? "Média" : "Fraca";
 
   return (
     <div className="space-y-1 pt-1" aria-live="polite">
       <p className="text-xs text-text-muted">
-        {t("Senha forte:")} {atendidos} {t("de")} {REQUISITOS_DA_SENHA.length} {t("requisitos atendidos")}
+        {t("Força da senha")}: <span data-testid="password-strength-label">{t(classificacao)}</span>
+      </p>
+      <p className="text-xs text-text-muted">
+        {t("Senha forte:")} {atendidos} {t("de")} {REQUISITOS_DA_SENHA.length}{" "}
+        {t("requisitos atendidos")}
       </p>
       <ul className="grid gap-1 text-xs sm:grid-cols-2">
         {REQUISITOS_DA_SENHA.map((requisito) => {
