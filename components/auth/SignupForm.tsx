@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useForm, type Resolver } from "react-hook-form";
+import { useForm, useWatch, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTransition, useState } from "react";
 
@@ -15,6 +15,7 @@ import {
 } from "@/lib/auth/schemas";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordStrength } from "@/components/auth/PasswordStrength";
 import { Label } from "@/components/ui/label";
 import { signUp } from "@/app/actions/auth/signUp";
 
@@ -40,6 +41,7 @@ export function SignupForm({ convite }: { convite?: ConviteDoSignup }) {
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors },
   } = useForm<SignupInput & { full_name: string }>({
     // O formulário tem UM tipo e DOIS contratos, e agora os dois contratos têm
@@ -60,6 +62,7 @@ export function SignupForm({ convite }: { convite?: ConviteDoSignup }) {
       password_confirm: "",
     },
   });
+  const password = useWatch({ control, name: "password" });
 
   const onSubmit = (values: SignupInput & { full_name: string }) => {
     setServerError(null);
@@ -95,9 +98,7 @@ export function SignupForm({ convite }: { convite?: ConviteDoSignup }) {
          * de tentativas — e não uma segunda porta de provisionamento.
          */
         if (res.sessao_ativa) {
-          router.replace(
-            convite ? `/team/accept-invite/${convite.token}` : "/get-started",
-          );
+          router.replace(convite ? `/team/accept-invite/${convite.token}` : "/get-started");
           return;
         }
         setSentTo(values.email);
@@ -145,10 +146,7 @@ export function SignupForm({ convite }: { convite?: ConviteDoSignup }) {
 
   if (sentTo) {
     return (
-      <div
-        className="space-y-2 rounded-md border bg-muted/40 px-4 py-6 text-center"
-        role="status"
-      >
+      <div className="space-y-2 rounded-md border bg-muted/40 px-4 py-6 text-center" role="status">
         <p className="text-sm font-medium">{t("Confirme seu e-mail")}</p>
         <p className="text-sm text-muted-foreground">
           {t("Enviamos um link de confirmação para")} <strong>{sentTo}</strong>.{" "}
@@ -167,36 +165,36 @@ export function SignupForm({ convite }: { convite?: ConviteDoSignup }) {
         nomeia (medido no diálogo de transferir conversa, em produção).
       */}
       {convite && (
-      <div className="space-y-1.5">
-        <Label htmlFor="full_name">{t("Seu nome")}</Label>
-        <Input
-          id="full_name"
-          type="text"
-          autoComplete="name"
-          autoFocus
-          aria-invalid={errors.full_name ? true : undefined}
-          {...register("full_name")}
-        />
-        {errors.full_name && (
-          <p className="text-xs text-destructive">{t(errors.full_name.message ?? "")}</p>
-        )}
-      </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="full_name">{t("Seu nome")}</Label>
+          <Input
+            id="full_name"
+            type="text"
+            autoComplete="name"
+            autoFocus
+            aria-invalid={errors.full_name ? true : undefined}
+            {...register("full_name")}
+          />
+          {errors.full_name && (
+            <p className="text-xs text-destructive">{t(errors.full_name.message ?? "")}</p>
+          )}
+        </div>
       )}
       {!convite && (
-      <div className="space-y-1.5">
-        <Label htmlFor="org_name">{t("Nome da empresa")}</Label>
-        <Input
-          id="org_name"
-          type="text"
-          autoComplete="organization"
-          autoFocus
-          aria-invalid={errors.org_name ? true : undefined}
-          {...register("org_name")}
-        />
-        {errors.org_name && (
-          <p className="text-xs text-destructive">{t(errors.org_name.message ?? "")}</p>
-        )}
-      </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="org_name">{t("Nome da empresa")}</Label>
+          <Input
+            id="org_name"
+            type="text"
+            autoComplete="organization"
+            autoFocus
+            aria-invalid={errors.org_name ? true : undefined}
+            {...register("org_name")}
+          />
+          {errors.org_name && (
+            <p className="text-xs text-destructive">{t(errors.org_name.message ?? "")}</p>
+          )}
+        </div>
       )}
       <div className="space-y-1.5">
         <Label htmlFor="email">Email</Label>
@@ -226,6 +224,7 @@ export function SignupForm({ convite }: { convite?: ConviteDoSignup }) {
         {errors.password && (
           <p className="text-xs text-destructive">{t(errors.password.message ?? "")}</p>
         )}
+        <PasswordStrength password={password} />
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="password_confirm">{t("Confirmar senha")}</Label>

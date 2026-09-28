@@ -70,6 +70,33 @@ export type Admin = ReturnType<typeof createAdminClient>;
 const JANELA_DO_ECO_MS = 60_000;
 
 /**
+ * A saudação automática do WhatsApp Business chega ao WAHA como `fromMe`,
+ * exatamente igual a uma mensagem digitada pelo dono. Ela não é atendimento
+ * humano: é o aplicativo respondendo a TODO novo chat antes de o CRM ter a
+ * chance de atender.
+ *
+ * Pausar a IA nesse caso é especialmente nocivo para quem acabou de sair de
+ * um formulário Meta: a pessoa já informou nome e interesse, mas recebe uma
+ * pergunta genérica e o agente fica mudo por uma hora. A checagem é proposital
+ * e estreita — só o texto-padrão de saudação/boas-vindas, nunca uma resposta
+ * comercial real. Qualquer outra fala do celular continua pausando a IA.
+ */
+export function pareceSaudacaoAutomaticaDoWhatsapp(texto: string | null | undefined): boolean {
+  const normalizado = (texto ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return (
+    normalizado.length <= 240 &&
+    /\bagradec(?:o|emos|e) seu contato\b/.test(normalizado) &&
+    /\bcomo podemos ajudar\b/.test(normalizado)
+  );
+}
+
+/**
  * A mensagem `fromMe` que chegou é o eco de um envio que ESTE CRM acabou de
  * fazer — e não alguém digitando no celular?
  *
@@ -1025,8 +1052,9 @@ async function handleOutboundFromUserPhone(
   //                                  engano é pior que não agir)
   // Quem reaproveitar esta condição para pular o INSERT reabre o #108.
   const ehEco = await ehEcoDeEnvioNosso(admin, session.organization_id, conversationId, p);
+  const saudacaoAutomatica = pareceSaudacaoAutomaticaDoWhatsapp(bodyOf(p));
   let comandoAplicado: typeof comando = null;
-  if (!ehEco) {
+  if (!ehEco && !saudacaoAutomatica) {
     let revogar = true;
     // C-076: o interruptor é do agente que atende ESTA conversa
     // (`ai_agents.config.aceita_comandos_celular`, ligado na tela). FAIL-CLOSED:
@@ -1071,6 +1099,11 @@ async function handleOutboundFromUserPhone(
     }
     // O comando não é fala de atendimento: esconde do cliente depois de aplicar.
     if (comandoAplicado && revogar) await revogarComando(session, chatId, p.id);
+  } else if (!ehEco && saudacaoAutomatica) {
+    logger.info("waha.ingest: saudação automática não pausou a IA", {
+      organization_id: session.organization_id,
+      conversation_id: conversationId,
+    });
   }
 
   await audit({

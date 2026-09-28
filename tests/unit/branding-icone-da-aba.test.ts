@@ -86,14 +86,15 @@ describe("o ícone carrega para quem NÃO entrou", () => {
     expect(icone).toMatch(/marcaDaSaida\(null\)/);
   });
 
-  it("o layout declara o ícone — é o que mata o pedido a /favicon.ico", () => {
+  it("o layout declara o símbolo oficial da Decola Aí", () => {
     // O 404 de /favicon.ico não é barato: em produção ele devolve a
     // `app/not-found.tsx` inteira (19.435 bytes) para um pedido de ícone.
-    // Desde a migration 0443 o link passa por `iconeDaAba`, que devolve o
-    // ícone desenhado (`/icon`) quando não há arquivo subido — os casos dela
-    // estão logo abaixo. O que não pode sumir é a DECLARAÇÃO no layout.
+    // O arquivo configurado na tela tem prioridade; antes de configurá-lo,
+    // esta instalação mantém o símbolo Decola já aprovado.
     const layout = fs.readFileSync(path.join(RAIZ, "app/layout.tsx"), "utf8");
-    expect(layout).toMatch(/icons:\s*\{\s*icon:\s*iconeDaAba\(/);
+    expect(layout).toMatch(/linha\?\.favicon_path\s*\?\s*iconeDaAba\(/);
+    expect(layout).toContain('"/decola-logo.svg"');
+    expect(fs.existsSync(path.join(RAIZ, "public/decola-logo.svg"))).toBe(true);
     expect(ICONE_DESENHADO).toBe("/icon");
   });
 });

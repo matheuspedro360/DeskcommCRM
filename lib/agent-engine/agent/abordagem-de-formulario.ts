@@ -60,7 +60,7 @@ export interface AbordagemDeFormularioInput {
 }
 
 export type AbordagemDeFormularioResult =
-  | { ok: true; texto: string }
+  | { ok: true; texto: string; pipelineIds: string[] }
   | { ok: false; reason: 'sem_agente_publicado' | 'texto_vazio' };
 
 /** Teto do texto que vai ao modelo — um formulário hostil não vira prompt gigante. */
@@ -251,5 +251,5 @@ export async function gerarAbordagemDeFormulario(
 
   const texto = (result.text ?? '').trim();
   if (!texto) return { ok: false, reason: 'texto_vazio' };
-  return { ok: true, texto };
+  return { ok: true, texto, pipelineIds: agent.pipelineIds };
 }

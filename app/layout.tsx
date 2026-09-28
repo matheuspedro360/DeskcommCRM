@@ -103,9 +103,10 @@ export async function generateMetadata(): Promise<Metadata> {
     // `/icon` faz o pedido ir para `app/icon.tsx`, que desenha a marca da
     // instalação em runtime — ver o cabeçalho daquele arquivo para por que ele
     // não pode ser um arquivo estático em `public/`.
-    // Com um ícone subido em `/admin/marca` (migration 0443), o link aponta para
-    // o arquivo no storage da instalação — ver `iconeDaAba`.
-    icons: { icon: iconeDaAba(linha?.favicon_path) },
+  // Com um ícone subido em `/admin/marca` (migration 0443), o link aponta para
+  // o arquivo no storage da instalação. Até configurar a imagem nessa tela,
+  // a instalação Decola conserva o símbolo já aprovado no navegador.
+  icons: { icon: linha?.favicon_path ? iconeDaAba(linha.favicon_path) : "/decola-logo.svg" },
   };
 }
 

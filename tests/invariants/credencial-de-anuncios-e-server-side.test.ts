@@ -54,6 +54,9 @@ const TABELAS = [
   "ad_platform_connections",
   "ad_conversion_dispatches",
   "ad_insights_connections",
+  // Formulários Instantâneos: tokens cifrados da Página e segredo do app.
+  // Também é exclusiva do servidor e não deve receber policy authenticated.
+  "meta_lead_connections",
   // 0380. Não guarda segredo: guarda a ESTRATÉGIA de mídia — que campanha
   // existe, como o conjunto foi segmentado, que criativo está no ar. É o que um
   // concorrente pagaria para ler, e o motivo de a tabela nascer com o mesmo

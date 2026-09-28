@@ -13,7 +13,7 @@ import { rotuloDoIndicador } from "@/lib/plataformas-de-anuncio/meta/tabela-de-c
 import type { LinhaDeCampanha } from "@/lib/plataformas-de-anuncio/types";
 
 /**
- * As 15 colunas.
+ * As 17 colunas.
  *
  * ─── A regra que atravessa o arquivo inteiro: ausência vira "—" ─────────────
  *
@@ -175,7 +175,7 @@ export function TabelaDeCampanhas({ linhas, moeda, avisos }: Props) {
   return (
     /*
       O scroll horizontal mora AQUI, num contêiner próprio — nunca no `<body>`.
-      São 15 colunas; em telas estreitas a tabela rola dentro do próprio quadro e
+      São 17 colunas; em telas estreitas a tabela rola dentro do próprio quadro e
       a página segue parada, que é o combinado do produto para conteúdo largo.
     */
     <div className="overflow-x-auto rounded-md border">
@@ -187,6 +187,8 @@ export function TabelaDeCampanhas({ linhas, moeda, avisos }: Props) {
             <TableHead>{t("Veiculação")}</TableHead>
             <TableHead className="text-right">{t("Resultado")}</TableHead>
             <TableHead className="text-right">{t("Custo por Resultado")}</TableHead>
+            <TableHead className="text-right">{t("Leads")}</TableHead>
+            <TableHead className="text-right">{t("Custo por lead")}</TableHead>
             <TableHead className="text-right">{t("Valor Gasto")}</TableHead>
             <TableHead className="text-right">{t("Impressões")}</TableHead>
             <TableHead className="text-right">{t("Alcance")}</TableHead>
@@ -258,6 +260,8 @@ export function TabelaDeCampanhas({ linhas, moeda, avisos }: Props) {
                 <TableCell className="text-right">
                   {dinheiro(linha.resultado.custoPorResultado)}
                 </TableCell>
+                <TableCell className="text-right"><Numero valor={linha.leads} /></TableCell>
+                <TableCell className="text-right">{dinheiro(linha.custoPorLead)}</TableCell>
                 <TableCell className="text-right">{dinheiro(linha.gasto)}</TableCell>
                 <TableCell className="text-right">
                   <Numero valor={linha.impressoes} />

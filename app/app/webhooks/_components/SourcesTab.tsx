@@ -14,6 +14,7 @@ import { PlugsConnected, Plus } from "@/lib/ui/icons";
 import { SeloDeAutoria } from "@/components/operacao/SeloDeAutoria";
 import { useWebhookSources, type WebhookSourceRow } from "@/hooks/webhooks/useWebhookSources";
 import { CreateSourceDialog } from "./CreateSourceDialog";
+import { CreateMetaLeadDialog } from "./CreateMetaLeadDialog";
 import { SourceDetail } from "./SourceDetail";
 import { useT } from "@/hooks/i18n/useT";
 
@@ -27,6 +28,7 @@ export function SourcesTab() {
   const t = useT();
   const { data, isLoading } = useWebhookSources();
   const [createOpen, setCreateOpen] = React.useState(false);
+  const [metaOpen, setMetaOpen] = React.useState(false);
   const [selected, setSelected] = React.useState<WebhookSourceRow | null>(null);
 
   const sources = data?.data ?? [];
@@ -54,9 +56,14 @@ export function SourcesTab() {
               <li>{t("2. Copie o endereço ou o formulário pronto.")}</li>
               <li>{t("3. Cole no seu site — cada envio vira um lead aqui dentro.")}</li>
             </ol>
-            <Button onClick={() => setCreateOpen(true)}>
-              <Plus /> {t("Criar primeira fonte")}
-            </Button>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button variant="outline" onClick={() => setMetaOpen(true)}>
+                <PlugsConnected /> {t("Conectar formulários da Meta")}
+              </Button>
+              <Button onClick={() => setCreateOpen(true)}>
+                <Plus /> {t("Criar primeira fonte")}
+              </Button>
+            </div>
           </CardContent>
         </Card>
         <CreateSourceDialog
@@ -64,6 +71,7 @@ export function SourcesTab() {
           onOpenChange={setCreateOpen}
           onCreated={setSelected}
         />
+        <CreateMetaLeadDialog open={metaOpen} onOpenChange={setMetaOpen} />
         {selected ? (
           <SourceDetail source={selected} open={!!selected} onOpenChange={() => setSelected(null)} />
         ) : null}
@@ -73,7 +81,10 @@ export function SourcesTab() {
 
   return (
     <div className="space-y-4 pt-4">
-      <div className="flex sm:justify-end">
+      <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+        <Button variant="outline" onClick={() => setMetaOpen(true)} className="w-full sm:w-auto">
+          <PlugsConnected /> {t("Conectar formulários da Meta")}
+        </Button>
         <Button onClick={() => setCreateOpen(true)} className="w-full sm:w-auto">
           <Plus /> {t("Nova fonte")}
         </Button>
@@ -104,6 +115,7 @@ export function SourcesTab() {
       </div>
 
       <CreateSourceDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={setSelected} />
+      <CreateMetaLeadDialog open={metaOpen} onOpenChange={setMetaOpen} />
       {selected ? (
         <SourceDetail source={selected} open={!!selected} onOpenChange={() => setSelected(null)} />
       ) : null}

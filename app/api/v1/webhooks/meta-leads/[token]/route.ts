@@ -1,0 +1,123 @@
+import { randomUUID } from "node:crypto";
+import { NextRequest } from "next/server";
+import { fail, ok } from "@/lib/api/wrappers";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { decryptWebhookSecret } from "@/lib/webhooks/secrets";
+import { assinaturaMetaValida, buildContactConsentMeta, extrairConsentimentoMeta, extrairEventosMetaLeadgen, mapearDetalheDoLeadMeta } from "@/lib/webhooks/meta-leadgen";
+import { POST as receberWebhookGenerico } from "@/app/api/v1/webhooks/in/[token]/route";
+import { consultarLeadDaMeta } from "@/lib/channels/meta-leadgen";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+type Ctx = { params: Promise<{ token: string }> };
+
+async function conexao(token: string) {
+  return createAdminClient().from("meta_lead_connections")
+    .select("id,organization_id,webhook_source_id,page_id,form_ids,app_secret_encrypted,page_access_token_encrypted,is_active,webhook_sources!inner(path_token)")
+    .eq("callback_token", token).eq("is_active", true).maybeSingle();
+}
+
+export async function GET(req: NextRequest, ctx: Ctx): Promise<Response> {
+  const { token } = await ctx.params;
+  const modo = req.nextUrl.searchParams.get("hub.mode");
+  const verify = req.nextUrl.searchParams.get("hub.verify_token");
+  const challenge = req.nextUrl.searchParams.get("hub.challenge");
+  const { data } = await conexao(token);
+  if (!data || modo !== "subscribe" || verify !== token || !challenge) return new Response("Forbidden", { status: 403 });
+  return new Response(challenge, { status: 200, headers: { "content-type": "text/plain" } });
+}
+
+export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
+  const requestId = randomUUID();
+  const { token } = await ctx.params;
+  const { data: callbackConnection, error } = await conexao(token);
+  if (error || !callbackConnection) return fail("not_found", "unknown Meta callback", 404, { requestId });
+  const admin = createAdminClient();
+  const raw = await req.text();
+  let payload: unknown;
+  try { payload = JSON.parse(raw); } catch { return fail("invalid_request", "invalid JSON", 400, { requestId }); }
+  const eventos = extrairEventosMetaLeadgen(payload);
+  const pageIds = [...new Set(eventos.map((evento) => evento.page_id))];
+  const { data: connections, error: connectionsError } = pageIds.length
+    ? await admin.from("meta_lead_connections")
+      .select("id,organization_id,webhook_source_id,page_id,form_ids,app_secret_encrypted,page_access_token_encrypted,is_active,webhook_sources!inner(path_token)")
+      .in("page_id", pageIds).eq("is_active", true)
+    : { data: [], error: null };
+  if (connectionsError) return fail("internal_error", "Meta connection lookup failed", 500, { requestId });
+
+  // A Meta mantém um único callback para o objeto Page de cada aplicativo.
+  // Portanto o token da URL identifica o ingresso compartilhado, enquanto a
+  // página presente no payload escolhe a conexão (e o tenant) que será usada.
+  const byPage = new Map((connections ?? []).map((connection) => [String(connection.page_id), connection]));
+  let aceitos = 0;
+  const falhas: string[] = [];
+  const recebidas = new Set<string>();
+  for (const evento of eventos) {
+    const c = byPage.get(evento.page_id);
+    if (!c || (c.form_ids.length && !c.form_ids.includes(evento.form_id))) continue;
+    recebidas.add(c.id);
+    const [appSecret, pageToken] = await Promise.all([
+      decryptWebhookSecret(admin, String(c.app_secret_encrypted)),
+      decryptWebhookSecret(admin, String(c.page_access_token_encrypted)),
+    ]);
+    if (!appSecret || !pageToken) {
+      falhas.push(`lead ${evento.leadgen_id}: credenciais indisponíveis`);
+      continue;
+    }
+    if (!assinaturaMetaValida(raw, req.headers.get("x-hub-signature-256"), appSecret)) {
+      falhas.push(`lead ${evento.leadgen_id}: assinatura inválida`);
+      continue;
+    }
+    const source = c.webhook_sources as unknown as { path_token: string };
+    const resposta = await consultarLeadDaMeta(evento.leadgen_id, pageToken);
+    const detalheBruto = await resposta.json().catch(() => null);
+    const detalhe = mapearDetalheDoLeadMeta(detalheBruto);
+    const consentimento = extrairConsentimentoMeta(detalheBruto);
+    if (!resposta.ok || !detalhe) {
+      falhas.push(`lead ${evento.leadgen_id}: Graph API ${resposta.status}`);
+      continue;
+    }
+    const corpo = { ...detalhe, nome: detalhe.full_name, telefone: detalhe.phone_number, email: detalhe.email, meta_page_id: evento.page_id, meta_form_id: evento.form_id, meta_ad_id: evento.ad_id };
+    const interna = new NextRequest(`https://internal/api/v1/webhooks/in/${source.path_token}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corpo) });
+    const result = await receberWebhookGenerico(interna, { params: Promise.resolve({ token: source.path_token }) });
+    if (result.ok) {
+      aceitos += 1;
+      if (consentimento) {
+        const respostaIngestao = await result.clone().json().catch(() => null) as { data?: { lead_id?: string } } | null;
+        const leadId = respostaIngestao?.data?.lead_id;
+        if (!leadId) {
+          falhas.push(`lead ${evento.leadgen_id}: resposta da ingestão sem lead_id`);
+          continue;
+        }
+        const { data: lead } = await admin.from("crm_leads").select("contact_id")
+          .eq("id", leadId).eq("organization_id", c.organization_id).maybeSingle();
+        if (!lead?.contact_id) {
+          falhas.push(`lead ${evento.leadgen_id}: contato não encontrado após ingestão`);
+          continue;
+        }
+        const { error: consentError } = await admin.from("contacts")
+          .update({ consent: buildContactConsentMeta(consentimento, evento.form_id) })
+          .eq("id", lead.contact_id).eq("organization_id", c.organization_id);
+        if (consentError) falhas.push(`lead ${evento.leadgen_id}: falha ao gravar consentimento`);
+      }
+    } else falhas.push(`lead ${evento.leadgen_id}: ingestão ${result.status}`);
+  }
+  if (recebidas.size) {
+    await admin.from("meta_lead_connections").update({
+      last_received_at: new Date().toISOString(),
+      last_error: falhas.length ? falhas.join("; ").slice(0, 1000) : null,
+    }).in("id", [...recebidas]);
+  }
+
+  // A Meta considera qualquer resposta não-2xx uma falha do lote inteiro e o
+  // reenviará. O endpoint genérico já é idempotente por leadgen_id, portanto
+  // pedimos retry quando um evento elegível falhou sem duplicar os aceitos.
+  if (falhas.length) {
+    return fail("upstream_error", "Não foi possível processar todos os leads da Meta.", 502, {
+      requestId,
+      details: { accepted: aceitos, failed: falhas.length },
+    });
+  }
+  return ok({ received: true, accepted: aceitos }, { requestId });
+}

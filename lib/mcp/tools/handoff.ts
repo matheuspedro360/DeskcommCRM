@@ -30,6 +30,7 @@ import { loadEligibleAttendants } from "@/lib/routing/eligibles";
 import { selectRoundRobin } from "@/lib/routing/decide";
 import { getQueuePosition } from "@/lib/routing/queue";
 import { logger } from "@/lib/logger";
+import { atribuirLeadDoHandoff } from "@/lib/leads/handoff-owner-sync";
 import type { McpToolDefinition } from "../types";
 
 const inputShape = {
@@ -98,6 +99,7 @@ export const crmRequestHumanHandoff: McpToolDefinition<typeof inputShape> = {
         .select("id")
         .eq("organization_id", ctx.organizationId)
         .eq("contact_id", conv.contact_id)
+        .eq("status", "open")
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -166,6 +168,16 @@ export const crmRequestHumanHandoff: McpToolDefinition<typeof inputShape> = {
           });
         } else {
           assignedUserId = picked;
+          // O negócio acompanha a conversa. lead.assigned alimenta a
+          // notificação direta (push, quando habilitado), além da Central.
+          if (leadId) {
+            const motivo = await atribuirLeadDoHandoff(ctx.supabase, {
+              organizationId: ctx.organizationId, leadId, userId: picked,
+            }).catch(() => "indisponivel" as const);
+            if (motivo === "indisponivel") logger.warn("[mcp.handoff] lead owner sync failed", {
+              lead_id: leadId,
+            });
+          }
         }
       }
 

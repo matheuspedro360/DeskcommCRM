@@ -11,6 +11,7 @@ import {
   rotuloDoIndicador,
   somaDeAcoes,
   valorDaAcao,
+  valorDeLeads,
   valorIndicado,
 } from "@/lib/plataformas-de-anuncio/meta/tabela-de-campanhas";
 
@@ -80,6 +81,19 @@ const SEM_RESULTS: LinhaDeInsightCrua = {
   impressions: "0",
   reach: "0",
   frequency: "0",
+};
+
+/** Resposta agregada observada na conta LCL em 26/09/2026. */
+const LEADS_SEM_RESULTS: LinhaDeInsightCrua = {
+  campaign_id: "campanha-formulario",
+  spend: "177.61",
+  results: [],
+  cost_per_result: [],
+  actions: [
+    { action_type: "offsite_complete_registration_add_meta_leads", value: "19" },
+    { action_type: "lead", value: "19" },
+    { action_type: "onsite_conversion.lead_grouped", value: "19" },
+  ],
 };
 
 /**
@@ -175,6 +189,29 @@ describe("results sem values — o formato que quebra o acesso ingênuo", () => 
     ]);
     // 3 de insights + 1 que só existe no cadastro (a homônima ativa).
     expect(linhas).toHaveLength(4);
+  });
+});
+
+describe("leads e custo por lead", () => {
+  it("recupera os leads de actions quando results vem vazio, sem contar o mesmo lead três vezes", () => {
+    const linha = primeira(montarTabelaDeCampanhas([], [LEADS_SEM_RESULTS]));
+    expect(valorDeLeads(LEADS_SEM_RESULTS)).toBe(19);
+    expect(linha.leads).toBe(19);
+    expect(linha.custoPorLead).toBeCloseTo(177.61 / 19, 6);
+    expect(linha.resultado.valor).toBe(19);
+    expect(linha.resultado.indicador).toBe("leadgen_grouped");
+  });
+
+  it("mantém resultado de conversa separado de leads e não inventa CPL", () => {
+    const linha = primeira(montarTabelaDeCampanhas(CAMPANHAS, [SEM_VEICULACAO]));
+    expect(linha.leads).toBeNull();
+    expect(linha.custoPorLead).toBeNull();
+  });
+
+  it("aproveita o indicador de lead em results mesmo quando actions não veio", () => {
+    const linha = primeira(montarTabelaDeCampanhas(CAMPANHAS, [CADASTRO_AGENDA_CHEIA]));
+    expect(linha.leads).toBe(13);
+    expect(linha.custoPorLead).toBeCloseTo(364.63 / 13, 6);
   });
 });
 

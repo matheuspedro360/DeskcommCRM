@@ -34,6 +34,8 @@ function linha(ajustes: Partial<LinhaDeCampanha> = {}): LinhaDeCampanha {
       custoPorResultado: 28.05,
       indicador: "actions:offsite_conversion.fb_pixel_lead",
     },
+    leads: 13,
+    custoPorLead: 28.05,
     gasto: 364.63,
     impressoes: 21281,
     alcance: 13894,
@@ -53,15 +55,17 @@ function rotulosDasColunas(): string[] {
 }
 
 describe("Connect rate na tela", () => {
-  it("nasce entre o CTR e a Frequência, e a tabela fica com 15 colunas", () => {
+  it("nasce entre o CTR e a Frequência, e a tabela fica com 17 colunas", () => {
     render(<TabelaDeCampanhas linhas={[linha()]} moeda="BRL" />);
 
     const rotulos = rotulosDasColunas();
     // A coluna nova não empurrou nenhuma vizinha para fora.
-    expect(rotulos).toHaveLength(15);
-    expect(rotulos[10]).toBe("Connect rate");
-    expect(rotulos[9]).toBe("CTR");
-    expect(rotulos[11]).toBe("Frequência");
+    expect(rotulos).toHaveLength(17);
+    expect(rotulos[12]).toBe("Connect rate");
+    expect(rotulos[11]).toBe("CTR");
+    expect(rotulos[13]).toBe("Frequência");
+    expect(rotulos[5]).toBe("Leads");
+    expect(rotulos[6]).toBe("Custo por lead");
   });
 
   it("leva a fórmula no `title`, como o Hook Rate leva o numerador", () => {
@@ -87,9 +91,17 @@ describe("Connect rate na tela", () => {
     if (!corpo) throw new Error("esperava a linha da campanha");
     const celulas = within(corpo).getAllByRole("cell");
 
-    // Campanha, Status, Veiculação, Resultado, Custo por Resultado, Valor Gasto,
-    // Impressões, Alcance, CPM, CTR → o Connect rate é a décima primeira.
-    expect(celulas[10]?.textContent).toBe("—");
+    // Duas colunas de lead entram antes do gasto; Connect rate é a 13ª.
+    expect(celulas[12]?.textContent).toBe("—");
     expect(within(corpo).queryByText("0,00%")).toBeNull();
+  });
+
+  it("mostra quantidade e custo por lead em colunas próprias", () => {
+    render(<TabelaDeCampanhas linhas={[linha()]} moeda="BRL" />);
+    const corpo = screen.getAllByRole("row")[1];
+    if (!corpo) throw new Error("esperava a linha da campanha");
+    const celulas = within(corpo).getAllByRole("cell");
+    expect(celulas[5]?.textContent).toBe("13");
+    expect(celulas[6]?.textContent).toContain("28,05");
   });
 });

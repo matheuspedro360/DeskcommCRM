@@ -1,5 +1,37 @@
 import { z } from "zod";
 
+export const REQUISITOS_DA_SENHA = [
+  {
+    id: "tamanho",
+    texto: "Pelo menos 8 caracteres",
+    confere: (senha: string) => senha.length >= 8,
+  },
+  {
+    id: "minuscula",
+    texto: "Uma letra minúscula",
+    confere: (senha: string) => /[a-z]/.test(senha),
+  },
+  {
+    id: "maiuscula",
+    texto: "Uma letra maiúscula",
+    confere: (senha: string) => /[A-Z]/.test(senha),
+  },
+  { id: "numero", texto: "Um número", confere: (senha: string) => /\d/.test(senha) },
+  { id: "simbolo", texto: "Um símbolo", confere: (senha: string) => /[^A-Za-z0-9]/.test(senha) },
+] as const;
+
+export function requisitosAtendidos(senha: string) {
+  return REQUISITOS_DA_SENHA.filter((requisito) => requisito.confere(senha)).length;
+}
+
+export const senhaForteSchema = z.string().superRefine((senha, contexto) => {
+  if (REQUISITOS_DA_SENHA.every((requisito) => requisito.confere(senha))) return;
+  contexto.addIssue({
+    code: "custom",
+    message: "Use uma senha forte que atenda a todos os requisitos",
+  });
+});
+
 export const loginSchema = z.object({
   email: z.string().email("Email inválido"),
   password: z.string().min(8, "Senha deve ter pelo menos 8 caracteres"),
@@ -23,7 +55,7 @@ export const signupSchema = z
   .object({
     org_name: organizationNameSchema,
     email: z.string().email("Email inválido"),
-    password: z.string().min(8, "Senha deve ter pelo menos 8 caracteres"),
+    password: senhaForteSchema,
     password_confirm: z.string(),
   })
   .refine((v) => v.password === v.password_confirm, {
@@ -57,7 +89,7 @@ export const signupComConviteSchema = z
      */
     full_name: z.string().trim().min(2, "Informe seu nome").max(120),
     email: z.string().email("Email inválido"),
-    password: z.string().min(8, "Senha deve ter pelo menos 8 caracteres"),
+    password: senhaForteSchema,
     password_confirm: z.string(),
   })
   .refine((v) => v.password === v.password_confirm, {
@@ -75,12 +107,7 @@ export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 
 export const resetPasswordSchema = z
   .object({
-    password: z
-      .string()
-      .min(8, "Senha deve ter pelo menos 8 caracteres")
-      .regex(/[A-Za-zÀ-ÿ]/, "Senha deve ter pelo menos uma letra")
-      .regex(/[0-9]/, "Senha deve ter pelo menos um número")
-      .regex(/[^A-Za-zÀ-ÿ0-9\s]/, "Senha deve ter pelo menos um símbolo"),
+    password: senhaForteSchema,
     password_confirm: z.string(),
     // Código TOTP: só exigido quando a conta tem MFA (a sessão de recovery é
     // AAL1 e o GoTrue pede AAL2 para trocar a senha). Opcional no schema; a

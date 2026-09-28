@@ -19,6 +19,16 @@ describe("normalizePhoneBR", () => {
 });
 
 describe("mapInboundPayload", () => {
+  it("reconhece nome e WhatsApp personalizados do formulário Meta sem perder respostas de qualificação", () => {
+    const m = mapInboundPayload({
+      nome_completo: "Cliente Exemplo",
+      "número_do_whatsapp": "+5511998765432",
+      email: "cliente@example.com",
+      qual_proximo_passo_voce_prefere: "conhecer_plantas_e_condicoes",
+    });
+    expect(m).toMatchObject({ name: "Cliente Exemplo", phone: "+5511998765432", email: "cliente@example.com" });
+    expect(m.custom_fields).toEqual({ qual_proximo_passo_voce_prefere: "conhecer_plantas_e_condicoes" });
+  });
   it("aliases default: nome/telefone/email", () => {
     const m = mapInboundPayload({ nome: "Ana", telefone: "11998765432", email: "a@b.com" });
     expect(m).toMatchObject({ name: "Ana", phone: "+5511998765432", email: "a@b.com" });
